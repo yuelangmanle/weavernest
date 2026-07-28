@@ -10,6 +10,7 @@ val signingProperties = Properties().apply {
     val propertiesFile = rootProject.file(".local/keys/zhique-release.properties")
     if (propertiesFile.exists()) propertiesFile.inputStream().use(::load)
 }
+val hasLocalSigningKey = signingProperties.getProperty("storeFile") != null
 
 android {
     namespace = "com.zhique.studio"
@@ -52,10 +53,10 @@ android {
 
     buildTypes {
         getByName("debug") {
-            signingConfig = signingConfigs.getByName("localRelease")
+            if (hasLocalSigningKey) signingConfig = signingConfigs.getByName("localRelease")
         }
         getByName("release") {
-            signingConfig = signingConfigs.getByName("localRelease")
+            signingConfig = if (hasLocalSigningKey) signingConfigs.getByName("localRelease") else signingConfigs.getByName("debug")
             isMinifyEnabled = false
         }
     }
