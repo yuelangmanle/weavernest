@@ -13,5 +13,6 @@
 - Tink（候选加密模块）— Apache-2.0
 - MapLibre Native（可选地图模块）— BSD-2-Clause
 - CodeMirror（编辑器资源候选）— MIT
+- Apilot Android API Profile V2（可选已安装应用互操作）— 织雀不内嵌其代码；协议与安装入口见 https://github.com/yuelangmanle/Apilot
 
 GPL/AGPL 项目不作为织雀发行版的代码底座。

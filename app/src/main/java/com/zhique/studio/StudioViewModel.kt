@@ -2,8 +2,12 @@ package com.zhique.studio
 
 import android.app.Application
 import android.app.DownloadManager
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.net.Uri
+import android.os.Build
 import android.os.Environment
 import android.util.Base64
 import androidx.compose.runtime.getValue
@@ -14,17 +18,20 @@ import androidx.lifecycle.viewModelScope
 import com.zhique.core.project.BuildPlanner
 import com.zhique.core.project.BuildRecord
 import com.zhique.core.project.CodeImportAnalyzer
+import com.zhique.core.project.ExternalCodeImport
 import com.zhique.core.project.ImportAnalysis
 import com.zhique.core.project.ProjectDocument
 import com.zhique.core.project.ProjectMetadata
 import com.zhique.core.project.ProjectReleasePolicy
 import com.zhique.core.project.ReleaseUpdatePolicy
+import com.zhique.core.project.UpdateAvailability
 import com.zhique.studio.data.AiSettings
 import com.zhique.studio.data.AiSettingsStore
 import com.zhique.studio.data.GitHubReleaseClient
 import com.zhique.studio.data.GitHubReleaseInfo
 import com.zhique.studio.data.OpenAiCompatibleClient
 import com.zhique.studio.data.ProjectStore
+import com.zhique.studio.integrations.ApilotProfile
 import java.io.File
 import java.util.Locale
 import java.util.UUID
@@ -42,6 +49,26 @@ enum class WorkspaceTab(val chinese: String, val english: String) {
     Data("数据", "Data")
 }
 
+sealed interface UpdateUiState {
+    data object Idle : UpdateUiState
+    data object Checking : UpdateUiState
+    data class UpToDate(val release: GitHubReleaseInfo) : UpdateUiState
+    data class DownloadAvailable(val release: GitHubReleaseInfo) : UpdateUiState
+    data class PackageMissing(val release: GitHubReleaseInfo) : UpdateUiState
+    data class DownloadQueued(val release: GitHubReleaseInfo) : UpdateUiState
+    data class DownloadFinished(val release: GitHubReleaseInfo) : UpdateUiState
+    data class DownloadFailed(val message: String) : UpdateUiState
+    data class Failed(val message: String) : UpdateUiState
+}
+
+enum class PreviewRuntimeStatus { Idle, Running, Stopped, Error }
+
+data class PreviewRuntimeUiState(
+    val status: PreviewRuntimeStatus = PreviewRuntimeStatus.Idle,
+    val runToken: Long = 0L,
+    val logs: List<String> = emptyList()
+)
+
 data class StudioUiState(
     val documents: List<ProjectDocument> = emptyList(),
     val selectedProjectId: String? = null,
@@ -50,8 +77,8 @@ data class StudioUiState(
     val importAnalysis: ImportAnalysis? = null,
     val aiDraft: String? = null,
     val isAiRequestRunning: Boolean = false,
-    val releaseInfo: GitHubReleaseInfo? = null,
-    val isUpdateCheckRunning: Boolean = false,
+    val update: UpdateUiState = UpdateUiState.Idle,
+    val previewRuntime: PreviewRuntimeUiState = PreviewRuntimeUiState(),
     val notice: String? = null
 ) {
     val selectedDocument: ProjectDocument?
@@ -99,11 +126,29 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
     private val aiSettingsStore = AiSettingsStore(application)
     private val aiClient = OpenAiCompatibleClient()
     private val releaseClient = GitHubReleaseClient()
+    private var queuedDownloadId: Long? = null
+    private val downloadReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action != DownloadManager.ACTION_DOWNLOAD_COMPLETE) return
+            val downloadId = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1L)
+            if (downloadId == queuedDownloadId) refreshDownloadStatus(downloadId)
+        }
+    }
 
     var state by mutableStateOf(
         StudioUiState(documents = projectStore.load())
     )
         private set
+
+    init {
+        val applicationContext = getApplication<Application>()
+        val filter = IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            applicationContext.registerReceiver(downloadReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            applicationContext.registerReceiver(downloadReceiver, filter)
+        }
+    }
 
     fun createBlankProject(displayName: String) {
         createProject(displayName, emptySet(), TemplateCatalog.all.first().html)
@@ -131,9 +176,40 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
         )
     }
 
+    fun showNotice(message: String) {
+        state = state.copy(notice = message)
+    }
+
     fun updateFile(path: String, content: String) {
         updateSelected { document -> document.withFile(path, content) }
         analyzeSelectedProject()
+    }
+
+    fun createFromPastedCode(projectName: String, source: String) {
+        if (source.isBlank()) {
+            state = state.copy(notice = "请先粘贴 HTML、CSS 或 JavaScript 代码。")
+            return
+        }
+        val draft = ExternalCodeImport.prepare(projectName, source)
+        val indexHtml = draft.files.getValue("index.html")
+        createProject(
+            displayName = draft.projectName,
+            capabilities = draft.analysis.suggestedCapabilities,
+            indexHtml = indexHtml,
+            extraFiles = draft.files - "index.html"
+        )
+        state = state.copy(selectedTab = WorkspaceTab.Files, importAnalysis = draft.analysis, notice = "代码已创建为项目；可编辑后点击运行。")
+    }
+
+    fun pasteIntoSelectedProject(source: String) {
+        val document = state.selectedDocument ?: return
+        if (source.isBlank()) {
+            state = state.copy(notice = "没有可导入的代码。")
+            return
+        }
+        val draft = ExternalCodeImport.prepare(document.metadata.displayName, source)
+        updateSelected { current -> current.copy(files = current.files + draft.files) }
+        state = state.copy(importAnalysis = draft.analysis, selectedTab = WorkspaceTab.Files, notice = "外部代码已写入项目；请运行预览确认。")
     }
 
     fun selectCapabilities(capabilities: Set<String>) {
@@ -173,17 +249,7 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun importPlainText(fileName: String, content: String) {
-        val normalized = when {
-            fileName.endsWith(".html", true) -> "index.html"
-            fileName.endsWith(".css", true) -> "style.css"
-            fileName.endsWith(".js", true) -> "app.js"
-            else -> fileName
-        }
-        val files = if (normalized == "index.html") mapOf(normalized to content) else mapOf(
-            "index.html" to TemplateCatalog.all.first().html,
-            normalized to content
-        )
-        createProject(fileName.substringBeforeLast('.').ifBlank { "导入项目" }, emptySet(), files["index.html"].orEmpty(), files - "index.html")
+        createFromPastedCode(fileName.substringBeforeLast('.').ifBlank { "导入项目" }, content)
     }
 
     fun importZip(fileName: String, bytes: ByteArray) {
@@ -245,6 +311,45 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
         analyzeSelectedProject()
     }
 
+    fun runPreview() {
+        state = state.copy(
+            selectedTab = WorkspaceTab.Preview,
+            previewRuntime = state.previewRuntime.copy(
+                status = PreviewRuntimeStatus.Running,
+                runToken = state.previewRuntime.runToken + 1,
+                logs = listOf("正在加载预览…")
+            ),
+            notice = null
+        )
+    }
+
+    fun stopPreview() {
+        state = state.copy(
+            previewRuntime = state.previewRuntime.copy(
+                status = PreviewRuntimeStatus.Stopped,
+                logs = state.previewRuntime.logs + "预览已停止。"
+            )
+        )
+    }
+
+    fun onPreviewReady() {
+        if (state.previewRuntime.status == PreviewRuntimeStatus.Running) {
+            state = state.copy(previewRuntime = state.previewRuntime.copy(logs = state.previewRuntime.logs + "预览正在运行。"))
+        }
+    }
+
+    fun onPreviewLog(message: String, isError: Boolean = false) {
+        val cleanMessage = message.trim().take(500)
+        if (cleanMessage.isBlank()) return
+        val logs = (state.previewRuntime.logs + cleanMessage).takeLast(40)
+        state = state.copy(
+            previewRuntime = state.previewRuntime.copy(
+                status = if (isError) PreviewRuntimeStatus.Error else state.previewRuntime.status,
+                logs = logs
+            )
+        )
+    }
+
     fun dismissAiDraft() {
         state = state.copy(aiDraft = null)
     }
@@ -256,27 +361,35 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun checkForUpdate() {
-        state = state.copy(isUpdateCheckRunning = true, notice = null)
+        state = state.copy(update = UpdateUiState.Checking, notice = null)
         viewModelScope.launch {
             runCatching { releaseClient.latest(BuildConfig.GITHUB_REPOSITORY) }
                 .onSuccess { release ->
-                    val newer = ReleaseUpdatePolicy.isNewer(BuildConfig.VERSION_NAME, release.tagName)
+                    val availability = ReleaseUpdatePolicy.availability(BuildConfig.VERSION_NAME, release.tagName, release.apkName)
+                    val update = when (availability) {
+                        UpdateAvailability.UpToDate -> UpdateUiState.UpToDate(release)
+                        UpdateAvailability.DownloadAvailable -> UpdateUiState.DownloadAvailable(release)
+                        UpdateAvailability.PackageMissing -> UpdateUiState.PackageMissing(release)
+                    }
                     state = state.copy(
-                        releaseInfo = release,
-                        isUpdateCheckRunning = false,
-                        notice = if (newer) "发现新版本 ${release.tagName}。" else "当前已是最新版本。"
+                        update = update,
+                        notice = when (availability) {
+                            UpdateAvailability.DownloadAvailable -> "发现新版本 ${release.tagName}，可直接下载。"
+                            UpdateAvailability.PackageMissing -> "发现新版本 ${release.tagName}，但发布方尚未上传 APK。"
+                            UpdateAvailability.UpToDate -> "当前已是最新版本。"
+                        }
                     )
                 }
-                .onFailure { error -> state = state.copy(isUpdateCheckRunning = false, notice = error.message ?: "无法检查更新。") }
+                .onFailure { error ->
+                    val message = error.message ?: "无法检查更新。"
+                    state = state.copy(update = UpdateUiState.Failed(message), notice = message)
+                }
         }
     }
 
     fun downloadLatestApk() {
-        val release = state.releaseInfo ?: return
-        val url = release.apkUrl ?: run {
-            state = state.copy(notice = "最新发布没有 APK 安装包。")
-            return
-        }
+        val release = (state.update as? UpdateUiState.DownloadAvailable)?.release ?: return
+        val url = release.apkUrl ?: return
         val request = DownloadManager.Request(Uri.parse(url))
             .setTitle(release.apkName ?: "织雀-${release.tagName}.apk")
             .setDescription("来自 GitHub Releases 的织雀安装包")
@@ -284,8 +397,21 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
             .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, release.apkName ?: "织雀-${release.tagName}.apk")
         val manager = getApplication<Application>().getSystemService(DownloadManager::class.java)
-        manager.enqueue(request)
-        state = state.copy(notice = "已交给系统下载管理器下载更新。")
+        queuedDownloadId = manager.enqueue(request)
+        state = state.copy(update = UpdateUiState.DownloadQueued(release), notice = "已开始下载更新；完成后请在系统下载通知中安装。")
+    }
+
+    fun applyApilotProfile(profile: ApilotProfile) {
+        aiSettingsStore.save(
+            AiSettings(
+                endpoint = profile.endpoint,
+                model = profile.model,
+                apiKey = profile.apiKey.orEmpty(),
+                providerId = profile.providerId,
+                protocolId = profile.protocolId
+            )
+        )
+        state = state.copy(notice = "已从 Apilot 导入 ${profile.providerId} 方案。")
     }
 
     private fun createProject(
@@ -323,6 +449,31 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
     private fun replaceDocument(document: ProjectDocument) {
         projectStore.save(document)
         state = state.copy(documents = state.documents.map { current -> if (current.metadata.id == document.metadata.id) document else current })
+    }
+
+    private fun refreshDownloadStatus(downloadId: Long) {
+        val release = (state.update as? UpdateUiState.DownloadQueued)?.release ?: return
+        val manager = getApplication<Application>().getSystemService(DownloadManager::class.java)
+        manager.query(DownloadManager.Query().setFilterById(downloadId)).use { cursor ->
+            if (!cursor.moveToFirst()) return
+            val status = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
+            state = when (status) {
+                DownloadManager.STATUS_SUCCESSFUL -> state.copy(
+                    update = UpdateUiState.DownloadFinished(release),
+                    notice = "更新下载完成，请在系统下载通知中安装。"
+                )
+                DownloadManager.STATUS_FAILED -> state.copy(
+                    update = UpdateUiState.DownloadFailed("更新下载失败，请检查网络后重试。"),
+                    notice = "更新下载失败，请检查网络后重试。"
+                )
+                else -> state
+            }
+        }
+    }
+
+    override fun onCleared() {
+        getApplication<Application>().unregisterReceiver(downloadReceiver)
+        super.onCleared()
     }
 
     private fun String.isTextFile(): Boolean = lowercase(Locale.ROOT).endsWith(

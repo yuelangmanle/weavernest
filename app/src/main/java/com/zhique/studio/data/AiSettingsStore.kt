@@ -7,7 +7,9 @@ import androidx.security.crypto.MasterKey
 data class AiSettings(
     val endpoint: String = "https://api.deepseek.com/v1",
     val model: String = "deepseek-chat",
-    val apiKey: String = ""
+    val apiKey: String = "",
+    val providerId: String = "deepseek",
+    val protocolId: String = "openai_compatible"
 )
 
 class AiSettingsStore(context: Context) {
@@ -22,7 +24,9 @@ class AiSettingsStore(context: Context) {
     fun load(): AiSettings = AiSettings(
         endpoint = preferences.getString("endpoint", null) ?: AiSettings().endpoint,
         model = preferences.getString("model", null) ?: AiSettings().model,
-        apiKey = preferences.getString("apiKey", null).orEmpty()
+        apiKey = preferences.getString("apiKey", null).orEmpty(),
+        providerId = preferences.getString("providerId", null) ?: AiSettings().providerId,
+        protocolId = preferences.getString("protocolId", null) ?: AiSettings().protocolId
     )
 
     fun save(settings: AiSettings) {
@@ -30,6 +34,8 @@ class AiSettingsStore(context: Context) {
             .putString("endpoint", settings.endpoint.trim().trimEnd('/'))
             .putString("model", settings.model.trim())
             .putString("apiKey", settings.apiKey.trim())
+            .putString("providerId", settings.providerId.trim().ifBlank { "custom" })
+            .putString("protocolId", settings.protocolId.trim().ifBlank { "openai_compatible" })
             .apply()
     }
 }

@@ -22,7 +22,8 @@ try {
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     if ($Task -eq ':app:assembleDebug') {
         New-Item -ItemType Directory -Force (Join-Path $projectRoot 'artifacts') | Out-Null
-        Copy-Item 'app\build\outputs\apk\debug\app-debug.apk' 'artifacts\zhique-v0.2.1-alpha.apk' -Force
+        $version = (Get-Content (Join-Path $projectRoot 'VERSION') -Raw).Trim()
+        Copy-Item 'app\build\outputs\apk\debug\app-debug.apk' (Join-Path $projectRoot "artifacts\zhique-v$version.apk") -Force
     }
 } finally {
     Pop-Location
