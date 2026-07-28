@@ -1,0 +1,9 @@
+.local/
+.gradle/
+**/build/
+artifacts/
+*.apk
+*.aab
+*.keystore
+*.jks
+local.properties
