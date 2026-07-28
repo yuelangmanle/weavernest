@@ -1,0 +1,1110 @@
+<!-- weaver-required: camera, geolocation, storage, notification, contacts, microphone, clipboard, vibrate, sensor, config -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>织雀 · 权限检测</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --surface: #1e293b;
+            --surface-2: #273548;
+            --surface-3: #334155;
+            --text: #e2e8f0;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --accent: #38bdf8;
+            --accent-glow: rgba(56, 189, 248, 0.25);
+            --success: #34d399;
+            --success-glow: rgba(52, 211, 153, 0.3);
+            --danger: #f87171;
+            --danger-glow: rgba(248, 113, 113, 0.3);
+            --warning: #fbbf24;
+            --warning-glow: rgba(251, 191, 36, 0.3);
+            --pill-untested: #475569;
+            --radius-sm: 10px;
+            --radius: 16px;
+            --radius-lg: 20px;
+            --font-mono: 'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace;
+            --safe-bottom: env(safe-area-inset-bottom, 16px);
+            --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        html {
+            font-size: 16px;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            min-height: 100dvh;
+            padding-bottom: calc(140px + var(--safe-bottom));
+            line-height: 1.5;
+            overflow-x: hidden;
+        }
+
+        /* 顶部导航 */
+        .header {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: var(--bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            padding: 14px 18px 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header-logo {
+            width: 40px;
+            height: 40px;
+            border-radius: 11px;
+            background: linear-gradient(135deg, #38bdf8, #818cf8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            flex-shrink: 0;
+            box-shadow: 0 4px 16px var(--accent-glow);
+        }
+
+        .header-info {
+            flex: 1;
+            min-width: 0;
+        }
+        .header-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            letter-spacing: -0.01em;
+            color: #fff;
+        }
+        .header-subtitle {
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+            margin-top: -1px;
+        }
+        .header-badge {
+            font-size: 0.68rem;
+            font-weight: 600;
+            padding: 5px 10px;
+            border-radius: 20px;
+            background: var(--surface-2);
+            color: var(--text-secondary);
+            white-space: nowrap;
+            letter-spacing: 0.02em;
+            flex-shrink: 0;
+        }
+        .header-badge.live {
+            background: rgba(52, 211, 153, 0.15);
+            color: var(--success);
+        }
+        .header-badge.offline {
+            background: rgba(248, 113, 113, 0.12);
+            color: var(--danger);
+        }
+
+        /* 环境提示条 */
+        .env-banner {
+            margin: 10px 16px 0;
+            padding: 10px 14px;
+            border-radius: var(--radius-sm);
+            font-size: 0.8rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            animation: fadeSlideIn 0.4s ease;
+        }
+        .env-banner.warn {
+            background: rgba(251, 191, 36, 0.1);
+            border: 1px solid rgba(251, 191, 36, 0.25);
+            color: var(--warning);
+        }
+        .env-banner.info {
+            background: rgba(56, 189, 248, 0.08);
+            border: 1px solid rgba(56, 189, 248, 0.2);
+            color: var(--accent);
+        }
+
+        @keyframes fadeSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-8px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* 分类标题 */
+        .section-title {
+            margin: 22px 16px 8px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .section-title::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: rgba(255, 255, 255, 0.06);
+            border-radius: 1px;
+        }
+
+        /* 卡片网格 */
+        .cards-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            padding: 0 16px;
+        }
+        @media (min-width: 480px) {
+            .cards-grid {
+                grid-template-columns: 1fr 1fr 1fr;
+                gap: 12px;
+            }
+        }
+
+        /* 单张卡片 */
+        .card {
+            background: var(--surface);
+            border-radius: var(--radius);
+            padding: 16px 14px 14px;
+            cursor: pointer;
+            position: relative;
+            border: 1.5px solid transparent;
+            transition: border-color var(--transition), box-shadow var(--transition), transform var(--transition), background var(--transition);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            min-height: 130px;
+            -webkit-tap-highlight-color: transparent;
+            outline: none;
+            overflow: hidden;
+        }
+        .card:active {
+            transform: scale(0.97);
+            background: var(--surface-2);
+        }
+        .card:focus-visible {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+
+        /* 卡片状态边框 */
+        .card.state-granted {
+            border-color: rgba(52, 211, 153, 0.4);
+            box-shadow: 0 0 20px -6px var(--success-glow);
+        }
+        .card.state-denied {
+            border-color: rgba(248, 113, 113, 0.4);
+            box-shadow: 0 0 20px -6px var(--danger-glow);
+        }
+        .card.state-unavailable {
+            border-color: rgba(100, 116, 139, 0.35);
+            opacity: 0.7;
+        }
+        .card.state-testing {
+            border-color: rgba(56, 189, 248, 0.5);
+            box-shadow: 0 0 22px -4px var(--accent-glow);
+            animation: pulseBorder 1.2s ease-in-out infinite;
+        }
+
+        @keyframes pulseBorder {
+            0%,
+            100% {
+                border-color: rgba(56, 189, 248, 0.4);
+            }
+            50% {
+                border-color: rgba(56, 189, 248, 0.8);
+            }
+        }
+
+        .card-icon-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .card-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            background: var(--surface-2);
+            flex-shrink: 0;
+        }
+        .card-status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            transition: background var(--transition), box-shadow var(--transition);
+        }
+        .dot-untested {
+            background: var(--pill-untested);
+            box-shadow: 0 0 0 0 transparent;
+        }
+        .dot-testing {
+            background: var(--accent);
+            box-shadow: 0 0 8px var(--accent-glow);
+            animation: dotPulse 0.7s ease-in-out infinite;
+        }
+        .dot-granted {
+            background: var(--success);
+            box-shadow: 0 0 10px var(--success-glow);
+        }
+        .dot-denied {
+            background: var(--danger);
+            box-shadow: 0 0 10px var(--danger-glow);
+        }
+        .dot-unavailable {
+            background: #64748b;
+            box-shadow: none;
+        }
+
+        @keyframes dotPulse {
+            0%,
+            100% {
+                box-shadow: 0 0 4px var(--accent-glow);
+            }
+            50% {
+                box-shadow: 0 0 16px var(--accent-glow);
+            }
+        }
+
+        .card-name {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: #fff;
+            letter-spacing: -0.01em;
+        }
+        .card-desc {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            line-height: 1.35;
+            flex: 1;
+        }
+        .card-action-hint {
+            font-size: 0.68rem;
+            font-weight: 600;
+            color: var(--accent);
+            letter-spacing: 0.03em;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .card-action-hint .arrow {
+            transition: transform var(--transition);
+        }
+        .card:active .card-action-hint .arrow {
+            transform: translateX(3px);
+        }
+
+        /* 日志面板 */
+        .log-panel {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 200;
+            background: var(--surface);
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+            box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.5);
+            max-height: 45vh;
+            display: flex;
+            flex-direction: column;
+            transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+            padding-bottom: var(--safe-bottom);
+        }
+        .log-panel.collapsed {
+            max-height: 52px;
+        }
+        .log-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            cursor: pointer;
+            flex-shrink: 0;
+            gap: 10px;
+            min-height: 48px;
+        }
+        .log-header-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 700;
+            font-size: 0.85rem;
+            letter-spacing: -0.01em;
+        }
+        .log-count {
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 3px 9px;
+            border-radius: 12px;
+            background: var(--surface-2);
+            color: var(--text-secondary);
+            min-width: 22px;
+            text-align: center;
+        }
+        .log-chevron {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            transition: transform 0.3s ease;
+        }
+        .log-panel:not(.collapsed) .log-chevron {
+            transform: rotate(180deg);
+        }
+        .log-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0 14px 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            -webkit-overflow-scrolling: touch;
+            scroll-behavior: smooth;
+        }
+        .log-list::-webkit-scrollbar {
+            width: 3px;
+        }
+        .log-list::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .log-list::-webkit-scrollbar-thumb {
+            background: var(--surface-3);
+            border-radius: 3px;
+        }
+        .log-entry {
+            font-size: 0.72rem;
+            padding: 8px 10px;
+            border-radius: 8px;
+            background: var(--surface-2);
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            animation: slideUp 0.3s ease;
+            flex-shrink: 0;
+        }
+        .log-entry .log-icon {
+            flex-shrink: 0;
+            font-size: 0.85rem;
+            margin-top: 1px;
+        }
+        .log-entry .log-content {
+            flex: 1;
+            min-width: 0;
+            word-break: break-all;
+        }
+        .log-entry .log-time {
+            font-size: 0.62rem;
+            color: var(--text-muted);
+            flex-shrink: 0;
+            white-space: nowrap;
+        }
+        .log-entry.success {
+            border-left: 3px solid var(--success);
+        }
+        .log-entry.fail {
+            border-left: 3px solid var(--danger);
+        }
+        .log-entry.info {
+            border-left: 3px solid var(--accent);
+        }
+        .log-entry.warn {
+            border-left: 3px solid var(--warning);
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(12px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .log-empty {
+            text-align: center;
+            padding: 20px;
+            color: var(--text-muted);
+            font-size: 0.78rem;
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 300;
+            padding: 10px 18px;
+            border-radius: 24px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            white-space: nowrap;
+            box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4);
+            letter-spacing: 0.01em;
+        }
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+        .toast.success {
+            background: #065f46;
+            color: #d1fae5;
+        }
+        .toast.error {
+            background: #7f1d1d;
+            color: #fee2e2;
+        }
+        .toast.info {
+            background: #1e3a5f;
+            color: #dbeafe;
+        }
+
+        /* 全局波纹 */
+        .ripple {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.12);
+            transform: scale(0);
+            animation: rippleEffect 0.55s ease-out forwards;
+            pointer-events: none;
+        }
+        @keyframes rippleEffect {
+            to {
+                transform: scale(4);
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 顶部 -->
+    <header class="header">
+        <div class="header-logo">🛡️</div>
+        <div class="header-info">
+            <div class="header-title">织雀 · 权限检测</div>
+            <div class="header-subtitle" id="headerSubtitle">验证系统权限调用能力</div>
+        </div>
+        <span class="header-badge" id="headerBadge">检测中…</span>
+    </header>
+
+    <!-- 环境提示 -->
+    <div class="env-banner info" id="envBanner" style="display:none;">
+        <span>ℹ️</span>
+        <span id="envBannerText"></span>
+    </div>
+
+    <!-- 需要用户授权的权限 -->
+    <div class="section-title">🔐 需用户授权</div>
+    <div class="cards-grid" id="sensitiveGrid">
+        <!-- 由JS动态生成 -->
+    </div>
+
+    <!-- 无需授权的功能 -->
+    <div class="section-title">⚡ 功能验证（无需授权）</div>
+    <div class="cards-grid" id="quickGrid">
+        <!-- 由JS动态生成 -->
+    </div>
+
+    <!-- 底部日志面板 -->
+    <div class="log-panel collapsed" id="logPanel">
+        <div class="log-header" id="logHeader" role="button" aria-label="展开/收起日志">
+            <div class="log-header-left">
+                <span>📋</span> 测试日志
+                <span class="log-count" id="logCount">0</span>
+            </div>
+            <span class="log-chevron">▲</span>
+        </div>
+        <div class="log-list" id="logList">
+            <div class="log-empty">点击上方卡片开始测试</div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+        (function() {
+            // ============ 检测织雀环境 ============
+            const hasWeaver = typeof window.weaver !== 'undefined' && window.weaver !== null;
+            const weaver = hasWeaver ? window.weaver : null;
+
+            // 检查特定API是否存在
+            function checkWeaverAPI(path) {
+                if (!hasWeaver) return false;
+                const parts = path.split('.');
+                let obj = weaver;
+                for (const p of parts) {
+                    if (obj == null || typeof obj !== 'object') return false;
+                    obj = obj[p];
+                }
+                return typeof obj === 'function' || (typeof obj === 'object' && obj !== null);
+            }
+
+            const apiAvailability = {
+                camera: checkWeaverAPI('camera.capture'),
+                geolocation: checkWeaverAPI('geolocation.getCurrentPosition'),
+                storage: checkWeaverAPI('storage.writeFile') && checkWeaverAPI('storage.readFile'),
+                notification: checkWeaverAPI('notification.requestPermission') || checkWeaverAPI('notification.show'),
+                contacts: checkWeaverAPI('contacts.pick'),
+                microphone: checkWeaverAPI('microphone.record') || checkWeaverAPI('microphone.requestPermission'),
+                clipboard: checkWeaverAPI('clipboard.write') && checkWeaverAPI('clipboard.read'),
+                vibrate: checkWeaverAPI('vibrate'),
+                sensor: checkWeaverAPI('sensor.subscribe'),
+                config: checkWeaverAPI('config.get'),
+            };
+
+            // ============ DOM引用 ============
+            const headerBadge = document.getElementById('headerBadge');
+            const headerSubtitle = document.getElementById('headerSubtitle');
+            const envBanner = document.getElementById('envBanner');
+            const envBannerText = document.getElementById('envBannerText');
+            const sensitiveGrid = document.getElementById('sensitiveGrid');
+            const quickGrid = document.getElementById('quickGrid');
+            const logPanel = document.getElementById('logPanel');
+            const logHeader = document.getElementById('logHeader');
+            const logList = document.getElementById('logList');
+            const logCount = document.getElementById('logCount');
+            const toast = document.getElementById('toast');
+
+            let logEntries = [];
+            let toastTimer = null;
+
+            // ============ 更新环境状态 ============
+            function updateEnvironmentStatus() {
+                if (hasWeaver) {
+                    headerBadge.textContent = '● 织雀已连接';
+                    headerBadge.className = 'header-badge live';
+                    headerSubtitle.textContent = '验证系统权限调用能力';
+                    envBanner.style.display = 'none';
+                } else {
+                    headerBadge.textContent = '○ 模拟模式';
+                    headerBadge.className = 'header-badge offline';
+                    headerSubtitle.textContent = '未检测到织雀环境 · 模拟测试';
+                    envBanner.className = 'env-banner warn';
+                    envBanner.style.display = 'flex';
+                    envBannerText.textContent =
+                        '未检测到 window.weaver，当前为模拟模式。请在织雀平台中运行以获得真实结果。';
+                }
+            }
+
+            // ============ Toast ============
+            function showToast(message, type = 'info') {
+                if (toastTimer) clearTimeout(toastTimer);
+                toast.textContent = message;
+                toast.className = 'toast ' + type + ' show';
+                toastTimer = setTimeout(() => {
+                    toast.className = 'toast';
+                }, 2000);
+            }
+
+            // ============ 日志 ============
+            function addLogEntry(icon, message, type, details = '') {
+                const now = new Date();
+                const timeStr = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                const entry = { icon, message, type, time: timeStr, details, id: Date.now() };
+                logEntries.unshift(entry);
+                if (logEntries.length > 60) logEntries.pop();
+                renderLogs();
+                logCount.textContent = logEntries.length;
+            }
+
+            function renderLogs() {
+                if (logEntries.length === 0) {
+                    logList.innerHTML = '<div class="log-empty">点击上方卡片开始测试</div>';
+                    return;
+                }
+                logList.innerHTML = logEntries.map(e => `
+                <div class="log-entry ${e.type}">
+                    <span class="log-icon">${e.icon}</span>
+                    <span class="log-content">${e.message}${e.details ? '<br><small style="color:#94a3b8;">' + e.details + '</small>' : ''}</span>
+                    <span class="log-time">${e.time}</span>
+                </div>
+            `).join('');
+                // 滚动到底部（最新日志在上面，所以滚到顶部）
+                logList.scrollTop = 0;
+            }
+
+            // ============ 日志面板折叠 ============
+            logHeader.addEventListener('click', () => {
+                logPanel.classList.toggle('collapsed');
+            });
+
+            // ============ 波纹效果 ============
+            function addRipple(e, card) {
+                const ripple = document.createElement('span');
+                ripple.className = 'ripple';
+                const rect = card.getBoundingClientRect();
+                const size = Math.max(rect.width, rect.height) * 1.2;
+                ripple.style.width = size + 'px';
+                ripple.style.height = size + 'px';
+                ripple.style.left = (e.clientX - rect.left - size / 2) + 'px';
+                ripple.style.top = (e.clientY - rect.top - size / 2) + 'px';
+                card.appendChild(ripple);
+                ripple.addEventListener('animationend', () => ripple.remove());
+            }
+
+            // ============ 获取weaver配置（演示weaver.config.get用法） ============
+            async function getWeaverConfig(key, defaultValue) {
+                if (!apiAvailability.config) {
+                    return defaultValue;
+                }
+                try {
+                    const result = await weaver.config.get(key);
+                    if (result === null || result === undefined) return defaultValue;
+                    return result;
+                } catch (err) {
+                    console.warn(`[weaver.config.get] 获取 "${key}" 失败:`, err.message);
+                    return defaultValue;
+                }
+            }
+
+            // ============ 测试函数定义 ============
+            const testDefinitions = [
+                // ---- 需要用户授权 ----
+                {
+                    id: 'camera',
+                    category: 'sensitive',
+                    name: '相机',
+                    icon: '📷',
+                    desc: '打开相机拍照，验证摄像头权限',
+                    async test() {
+                        if (!apiAvailability.camera) throw new Error('UNSUPPORTED');
+                        const result = await weaver.camera.capture({ quality: 0.7 });
+                        return { summary: '拍照成功', detail: `返回数据长度: ${result?.dataUrl?.length || 'N/A'} 字符` };
+                    },
+                },
+                {
+                    id: 'geolocation',
+                    category: 'sensitive',
+                    name: '地理位置',
+                    icon: '📍',
+                    desc: '获取当前GPS定位信息',
+                    async test() {
+                        if (!apiAvailability.geolocation) throw new Error('UNSUPPORTED');
+                        const pos = await weaver.geolocation.getCurrentPosition();
+                        return {
+                            summary: '定位成功',
+                            detail: `纬度 ${pos?.latitude?.toFixed(5) ?? '?'}, 经度 ${pos?.longitude?.toFixed(5) ?? '?'}`
+                        };
+                    },
+                },
+                {
+                    id: 'storage',
+                    category: 'sensitive',
+                    name: '存储',
+                    icon: '💾',
+                    desc: '写入并读取测试文件，验证存储权限',
+                    async test() {
+                        if (!apiAvailability.storage) throw new Error('UNSUPPORTED');
+                        const testPath = 'zhique_permission_test_' + Date.now() + '.txt';
+                        const testData = '织雀存储权限测试 - ' + new Date().toISOString();
+                        await weaver.storage.writeFile(testPath, testData);
+                        const readBack = await weaver.storage.readFile(testPath);
+                        const match = readBack === testData;
+                        return {
+                            summary: match ? '写入并读取一致' : '读写数据不一致',
+                            detail: `测试文件: ${testPath}, 数据匹配: ${match ? '✅' : '❌'}`
+                        };
+                    },
+                },
+                {
+                    id: 'notification',
+                    category: 'sensitive',
+                    name: '通知',
+                    icon: '🔔',
+                    desc: '请求通知权限并发送测试通知',
+                    async test() {
+                        if (!apiAvailability.notification) throw new Error('UNSUPPORTED');
+                        // 通过config获取可配置的通知内容（演示weaver.config.get）
+                        const title = await getWeaverConfig('test.notification.title', '织雀权限测试');
+                        const body = await getWeaverConfig('test.notification.body', '通知权限验证通过 ✓');
+                        if (typeof weaver.notification.requestPermission === 'function') {
+                            const perm = await weaver.notification.requestPermission();
+                            if (perm !== 'granted') throw new Error('PERM_DENIED');
+                        }
+                        await weaver.notification.show(title, body);
+                        return { summary: '通知已发送', detail: `标题: "${title}"` };
+                    },
+                },
+                {
+                    id: 'contacts',
+                    category: 'sensitive',
+                    name: '联系人',
+                    icon: '👤',
+                    desc: '选择一个联系人，验证通讯录权限',
+                    async test() {
+                        if (!apiAvailability.contacts) throw new Error('UNSUPPORTED');
+                        const contact = await weaver.contacts.pick();
+                        return {
+                            summary: '已选择联系人',
+                            detail: `姓名: ${contact?.name || '未知'}, 电话: ${contact?.phone || 'N/A'}`
+                        };
+                    },
+                },
+                {
+                    id: 'microphone',
+                    category: 'sensitive',
+                    name: '麦克风',
+                    icon: '🎤',
+                    desc: '请求录音权限并录制简短音频',
+                    async test() {
+                        if (!apiAvailability.microphone) throw new Error('UNSUPPORTED');
+                        if (typeof weaver.microphone.requestPermission === 'function') {
+                            const perm = await weaver.microphone.requestPermission();
+                            if (perm !== 'granted') throw new Error('PERM_DENIED');
+                        }
+                        const recording = await weaver.microphone.record({ duration: 1500 });
+                        return {
+                            summary: '录音完成',
+                            detail: `录音时长约1.5秒, 数据大小: ${recording?.dataUrl?.length || 'N/A'} 字符`
+                        };
+                    },
+                },
+                // ---- 无需授权 ----
+                {
+                    id: 'clipboard',
+                    category: 'quick',
+                    name: '剪贴板',
+                    icon: '📋',
+                    desc: '写入并读取剪贴板内容',
+                    async test() {
+                        if (!apiAvailability.clipboard) throw new Error('UNSUPPORTED');
+                        const testStr = '织雀剪贴板测试_' + Math.random().toString(36).slice(2, 8);
+                        await weaver.clipboard.write(testStr);
+                        const readBack = await weaver.clipboard.read();
+                        const match = readBack === testStr;
+                        return {
+                            summary: match ? '剪贴板读写一致' : '读取内容不匹配',
+                            detail: `写入: "${testStr}", 读取: "${readBack}"`
+                        };
+                    },
+                },
+                {
+                    id: 'vibrate',
+                    category: 'quick',
+                    name: '振动',
+                    icon: '📳',
+                    desc: '触发设备振动反馈',
+                    async test() {
+                        if (!apiAvailability.vibrate) throw new Error('UNSUPPORTED');
+                        await weaver.vibrate(300);
+                        return { summary: '振动已触发', detail: '持续时间: 300ms' };
+                    },
+                },
+                {
+                    id: 'sensor',
+                    category: 'quick',
+                    name: '传感器',
+                    icon: '📐',
+                    desc: '订阅加速度计数据（3秒采样）',
+                    async test() {
+                        if (!apiAvailability.sensor) throw new Error('UNSUPPORTED');
+                        return new Promise((resolve, reject) => {
+                            const samples = [];
+                            const sub = weaver.sensor.subscribe('accelerometer', (data) => {
+                                samples.push(data);
+                                if (samples.length >= 10) {
+                                    sub.unsubscribe();
+                                    const xAvg = (samples.reduce((s, d) => s + (d.x || 0), 0) / samples
+                                        .length).toFixed(3);
+                                    const yAvg = (samples.reduce((s, d) => s + (d.y || 0), 0) / samples
+                                        .length).toFixed(3);
+                                    const zAvg = (samples.reduce((s, d) => s + (d.z || 0), 0) / samples
+                                        .length).toFixed(3);
+                                    resolve({
+                                        summary: '传感器数据采集完成',
+                                        detail: `采样${samples.length}次, 均值 x:${xAvg} y:${yAvg} z:${zAvg}`
+                                    });
+                                }
+                            });
+                            // 超时保护
+                            setTimeout(() => {
+                                if (sub && typeof sub.unsubscribe === 'function') sub.unsubscribe();
+                                if (samples.length > 0) {
+                                    resolve({ summary: '传感器采样（部分）', detail: `采集到${samples.length}个样本` });
+                                } else {
+                                    reject(new Error('TIMEOUT'));
+                                }
+                            }, 4000);
+                        });
+                    },
+                },
+            ];
+
+            // ============ 卡片状态管理 ============
+            const cardStates = {};
+            testDefinitions.forEach(t => {
+                cardStates[t.id] = 'untested'; // untested | testing | granted | denied | unavailable | error
+            });
+
+            function getStatusDotClass(state) {
+                const map = {
+                    untested: 'dot-untested',
+                    testing: 'dot-testing',
+                    granted: 'dot-granted',
+                    denied: 'dot-denied',
+                    unavailable: 'dot-unavailable',
+                    error: 'dot-denied',
+                };
+                return map[state] || 'dot-untested';
+            }
+
+            function getCardStateClass(state) {
+                const map = {
+                    untested: '',
+                    testing: 'state-testing',
+                    granted: 'state-granted',
+                    denied: 'state-denied',
+                    unavailable: 'state-unavailable',
+                    error: 'state-denied',
+                };
+                return map[state] || '';
+            }
+
+            function getStateLabel(state) {
+                const map = {
+                    untested: '待测试',
+                    testing: '测试中…',
+                    granted: '✅ 已授权',
+                    denied: '❌ 已拒绝',
+                    unavailable: '⊘ 不支持',
+                    error: '⚠ 出错',
+                };
+                return map[state] || '未知';
+            }
+
+            // ============ 渲染卡片 ============
+            function renderCards() {
+                const sensitiveDefs = testDefinitions.filter(t => t.category === 'sensitive');
+                const quickDefs = testDefinitions.filter(t => t.category === 'quick');
+
+                sensitiveGrid.innerHTML = sensitiveDefs.map(t => buildCardHTML(t)).join('');
+                quickGrid.innerHTML = quickDefs.map(t => buildCardHTML(t)).join('');
+
+                // 绑定事件
+                document.querySelectorAll('.card[data-test-id]').forEach(card => {
+                    card.addEventListener('click', function(e) {
+                        addRipple(e, this);
+                        const testId = this.getAttribute('data-test-id');
+                        runTest(testId, this);
+                    });
+                    // 键盘支持
+                    card.addEventListener('keydown', function(e) {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            this.click();
+                        }
+                    });
+                });
+            }
+
+            function buildCardHTML(t) {
+                const state = cardStates[t.id];
+                const dotClass = getStatusDotClass(state);
+                const cardClass = getCardStateClass(state);
+                const stateLabel = getStateLabel(state);
+                return `
+                <div class="card ${cardClass}" data-test-id="${t.id}" role="button" tabindex="0"
+                     aria-label="${t.name} - ${stateLabel}，点击测试">
+                    <div class="card-icon-row">
+                        <div class="card-icon">${t.icon}</div>
+                        <div class="card-status-dot ${dotClass}" aria-hidden="true"></div>
+                    </div>
+                    <div class="card-name">${t.name}</div>
+                    <div class="card-desc">${t.desc}</div>
+                    <div style="display:flex;align-items:center;justify-content:space-between;">
+                        <span style="font-size:0.68rem;color:var(--text-muted);">${stateLabel}</span>
+                        <span class="card-action-hint">测试 <span class="arrow">→</span></span>
+                    </div>
+                </div>`;
+            }
+
+            function updateCardUI(testId) {
+                const card = document.querySelector(`.card[data-test-id="${testId}"]`);
+                if (!card) return;
+                const t = testDefinitions.find(d => d.id === testId);
+                if (!t) return;
+                const state = cardStates[testId];
+                card.className = 'card ' + getCardStateClass(state);
+                const dotEl = card.querySelector('.card-status-dot');
+                if (dotEl) dotEl.className = 'card-status-dot ' + getStatusDotClass(state);
+                const stateLabelEl = card.querySelector('span[style]');
+                // 更新状态标签（第一个小span）
+                const spans = card.querySelectorAll('span');
+                spans.forEach(s => {
+                    if (s.textContent && ['待测试', '测试中…', '✅ 已授权', '❌ 已拒绝', '⊘ 不支持', '⚠ 出错']
+                        .some(l => s.textContent.includes(l) || s.textContent === l)) {
+                        s.textContent = getStateLabel(state);
+                    }
+                });
+            }
+
+            // ============ 执行测试 ============
+            async function runTest(testId, cardElement) {
+                const t = testDefinitions.find(d => d.id === testId);
+                if (!t) return;
+
+                // 防止重复点击
+                if (cardStates[testId] === 'testing') {
+                    showToast('该测试正在进行中…', 'info');
+                    return;
+                }
+
+                // 更新状态为测试中
+                cardStates[testId] = 'testing';
+                updateCardUI(testId);
+                addLogEntry('⏳', `[${t.name}] 开始测试…`, 'info');
+
+                try {
+                    const result = await t.test();
+                    // 成功
+                    cardStates[testId] = 'granted';
+                    updateCardUI(testId);
+                    addLogEntry('✅', `[${t.name}] ${result.summary}`, 'success', result.detail || '');
+                    showToast(`${t.name}: ${result.summary}`, 'success');
+                } catch (err) {
+                    const errMsg = err.message || String(err);
+                    if (errMsg === 'UNSUPPORTED') {
+                        cardStates[testId] = 'unavailable';
+                        updateCardUI(testId);
+                        addLogEntry('⊘', `[${t.name}] 设备不支持此功能`, 'warn', 'weaver API 不可用');
+                        showToast(`${t.name}: 设备不支持`, 'info');
+                    } else if (errMsg === 'PERM_DENIED') {
+                        cardStates[testId] = 'denied';
+                        updateCardUI(testId);
+                        addLogEntry('❌', `[${t.name}] 用户拒绝了权限`, 'fail', '请在系统设置中手动授予权限后重试');
+                        showToast(`${t.name}: 权限被拒绝`, 'error');
+                    } else if (errMsg === 'TIMEOUT') {
+                        cardStates[testId] = 'error';
+                        updateCardUI(testId);
+                        addLogEntry('⚠️', `[${t.name}] 操作超时`, 'warn', '传感器数据采集超时');
+                        showToast(`${t.name}: 操作超时`, 'error');
+                    } else {
+                        cardStates[testId] = 'error';
+                        updateCardUI(testId);
+                        addLogEntry('⚠️', `[${t.name}] 测试出错: ${errMsg}`, 'fail', err.stack ? err.stack.slice(0,
+                            200) : '');
+                        showToast(`${t.name}: 出错 - ${errMsg}`, 'error');
+                    }
+                }
+
+                // 自动展开日志面板
+                if (logPanel.classList.contains('collapsed')) {
+                    logPanel.classList.remove('collapsed');
+                    setTimeout(() => {
+                        logList.scrollTop = 0;
+                    }, 350);
+                }
+            }
+
+            // ============ 初始化 ============
+            async function init() {
+                updateEnvironmentStatus();
+                renderCards();
+
+                // 演示：通过weaver.config.get获取可配置项
+                if (apiAvailability.config) {
+                    try {
+                        const customTitle = await weaver.config.get('test.notification.title');
+                        if (customTitle) {
+                            addLogEntry('⚙️', '已加载运行时配置: test.notification.title', 'info', `值: "${customTitle}"`);
+                        }
+                    } catch (e) {
+                        // 静默处理，使用默认值
+                    }
+                }
+
+                // 初始日志
+                if (hasWeaver) {
+                    const availableAPIs = Object.entries(apiAvailability).filter(([, v]) => v).map(([k]) => k);
+                    addLogEntry('🚀', '织雀环境已就绪', 'success',
+                        `可用API: ${availableAPIs.join(', ') || '无'} | 共${testDefinitions.length}项测试`);
+                } else {
+                    addLogEntry('ℹ️', '模拟模式 - 所有测试将模拟执行', 'info',
+                        '请在织雀平台中加载此页面以获得真实的权限测试结果');
+                }
+            }
+
+            // ============ 模拟模式：拦截测试以提供有意义的反馈 ============
+            if (!hasWeaver) {
+                // 重写测试函数为模拟版本
+                testDefinitions.forEach(t => {
+                    const originalTest = t.test;
+                    t.test = async function() {
+                        // 检查API可用性（模拟模式下都是false，除了可能的config）
+                        if (t.id === 'config') {
+                            return originalTest.call(t);
+                        }
+                        // 模拟延迟
+                        await new Promise(r => setTimeout(r, 400 + Math.random() * 600));
+                        // 在模拟模式下，抛出UNSUPPORTED让UI显示"不支持"
+                        throw new Error('UNSUPPORTED');
+                    };
+                });
+                // 但保留日志中的说明
+            }
+
+            // 启动
+            init().catch(err => {
+                console.error('初始化失败:', err);
+                addLogEntry('💥', '初始化失败: ' + err.message, 'fail');
+            });
+
+            // ============ 全局错误捕获 ============
+            window.addEventListener('error', (e) => {
+                if (e.target === window || e.target === document) {
+                    addLogEntry('💥', '全局异常: ' + (e.error?.message || e.message), 'fail');
+                }
+            });
+            window.addEventListener('unhandledrejection', (e) => {
+                addLogEntry('💥', '未处理的Promise拒绝: ' + (e.reason?.message || String(e.reason)), 'fail');
+            });
+
+            console.log('🛡️ 织雀权限检测工具已就绪');
+            console.log('  window.weaver:', hasWeaver ? '✅ 已检测到' : '⚠️ 未检测到（模拟模式）');
+            console.log('  测试项数量:', testDefinitions.length);
+            console.log('  点击任意卡片开始测试对应权限');
+        })();
+    </script>
+</body>
+</html>

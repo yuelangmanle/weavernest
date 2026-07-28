@@ -2,6 +2,26 @@
 
 All notable user-facing changes are recorded here.
 
+## 0.3.1-alpha - 2026-07-28
+
+### Fixed
+
+- 系统返回键现在优先关闭当前弹层、返回项目首页，首页需连续返回两次才会退出应用。
+- Apilot 现在声明 Android 11+ 包可见性，已安装且兼容的 Apilot 不再被误判为未安装。
+- Apilot 未安装、版本不兼容或被系统停用时显示可取消的应用内引导；不会再自动跳转 GitHub。
+- `window.weaver` 在项目脚本运行前注入，外部代码不会因注入顺序误判织雀环境不存在。
+- 解析 `weaver-required` 权限注释并映射到项目能力；补齐麦克风和振动能力的 Manifest 声明。
+
+### Changed
+
+- 下线未通过真机能力验证的模板，仅保留明确标注的离线数据示例。
+- 新增浅色/深色品牌主题基础，使用金色作为强调色而非整页黑金配色。
+- 提示词升级为 2.0.0，提供中文和英文复制入口，并要求生成代码先等待 `window.weaver.ready()`。
+
+### Known limitations
+
+- 相机、定位、通知、联系人、麦克风、传感器等 `weaver` P0 API 已有稳定名称与环境注入，但真实 Android 原生调用仍在 `0.4.0-alpha` Runtime 模块中实现；当前会返回明确的 `UNSUPPORTED` 错误，不会伪造成功。
+
 ## 0.3.0-alpha - 2026-07-28
 
 ### Added

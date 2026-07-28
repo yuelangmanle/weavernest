@@ -35,6 +35,11 @@ object ApilotV2 {
 
     fun isAvailable(context: Context): Boolean = createPickIntent(false).resolveActivity(context.packageManager) != null
 
+    fun createImportProbeIntent(): Intent = Intent(importAction).apply {
+        setPackage(packageName)
+        type = importMimeType
+    }
+
     fun createPickIntent(includeApiKey: Boolean): Intent = Intent(pickAction).apply {
         setPackage(packageName)
         putExtra(extraSourceName, "织雀 Zhique")

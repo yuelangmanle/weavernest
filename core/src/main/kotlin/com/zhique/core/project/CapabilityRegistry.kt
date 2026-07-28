@@ -6,7 +6,8 @@ data class CapabilityDefinition(
     val manifestPermissions: Set<String> = emptySet(),
     val minimumApi: Int = 29,
     val requiresSpecialSystemFlow: Boolean = false,
-    val availabilityNote: String? = null
+    val availabilityNote: String? = null,
+    val aliases: Set<String> = emptySet()
 )
 
 data class CapabilityValidation(
@@ -23,11 +24,13 @@ object CapabilityRegistry {
         CapabilityDefinition("camera", "相机", setOf("android.permission.CAMERA")),
         CapabilityDefinition("media_images", "图片和相册", setOf("android.permission.READ_MEDIA_IMAGES"), 33),
         CapabilityDefinition("media_audio", "音频媒体", setOf("android.permission.READ_MEDIA_AUDIO"), 33),
-        CapabilityDefinition("files", "文件选择和保存"),
+        CapabilityDefinition("media_video", "视频媒体", setOf("android.permission.READ_MEDIA_VIDEO"), 33),
+        CapabilityDefinition("storage", "文件与存储", aliases = setOf("files")),
         CapabilityDefinition(
-            "location",
+            "geolocation",
             "精确定位",
-            setOf("android.permission.ACCESS_COARSE_LOCATION", "android.permission.ACCESS_FINE_LOCATION")
+            setOf("android.permission.ACCESS_COARSE_LOCATION", "android.permission.ACCESS_FINE_LOCATION"),
+            aliases = setOf("location")
         ),
         CapabilityDefinition(
             "background_location",
@@ -36,6 +39,19 @@ object CapabilityRegistry {
             requiresSpecialSystemFlow = true,
             availabilityNote = "Android requires a separate settings flow after foreground location is granted."
         ),
+        CapabilityDefinition(
+            "notification",
+            "通知",
+            setOf("android.permission.POST_NOTIFICATIONS"),
+            33,
+            aliases = setOf("notifications")
+        ),
+        CapabilityDefinition("contacts", "联系人", setOf("android.permission.READ_CONTACTS")),
+        CapabilityDefinition("microphone", "麦克风", setOf("android.permission.RECORD_AUDIO")),
+        CapabilityDefinition("clipboard", "剪贴板"),
+        CapabilityDefinition("haptics", "振动与触觉", setOf("android.permission.VIBRATE"), aliases = setOf("vibrate")),
+        CapabilityDefinition("sensors", "运动和设备传感器", aliases = setOf("sensor")),
+        CapabilityDefinition("config", "运行时私密配置"),
         CapabilityDefinition(
             "bluetooth_le",
             "低功耗蓝牙",
@@ -68,12 +84,9 @@ object CapabilityRegistry {
             availabilityNote = "Only local-only hotspot APIs are available to ordinary applications."
         ),
         CapabilityDefinition("network", "网络和 API", setOf("android.permission.INTERNET")),
-        CapabilityDefinition("notifications", "通知", setOf("android.permission.POST_NOTIFICATIONS"), 33),
-        CapabilityDefinition("contacts", "联系人", setOf("android.permission.READ_CONTACTS")),
         CapabilityDefinition("calendar", "日历", setOf("android.permission.READ_CALENDAR", "android.permission.WRITE_CALENDAR")),
         CapabilityDefinition("phone_dial", "拨号", setOf("android.permission.CALL_PHONE")),
         CapabilityDefinition("nfc", "NFC"),
-        CapabilityDefinition("sensors", "运动和设备传感器"),
         CapabilityDefinition("background_tasks", "后台任务", requiresSpecialSystemFlow = true),
         CapabilityDefinition(
             "manage_external_storage",
@@ -81,13 +94,24 @@ object CapabilityRegistry {
             requiresSpecialSystemFlow = true,
             availabilityNote = "Android only grants this through a special settings screen when it is justified."
         )
-    ).associateBy(CapabilityDefinition::id)
+    )
 
-    fun all(): List<CapabilityDefinition> = definitions.values.sortedBy(CapabilityDefinition::title)
+    private val canonicalById = definitions.associateBy(CapabilityDefinition::id)
+    private val canonicalIdByAlias = definitions.flatMap { definition ->
+        definition.aliases.map { alias -> alias to definition.id }
+    }.toMap()
+
+    fun all(): List<CapabilityDefinition> = definitions.sortedBy(CapabilityDefinition::title)
+
+    fun canonicalId(id: String): String? = when {
+        id in canonicalById -> id
+        else -> canonicalIdByAlias[id]
+    }
 
     fun validate(capabilityIds: Set<String>): CapabilityValidation {
-        val selected = capabilityIds.mapNotNull(definitions::get)
-        val unknown = capabilityIds - definitions.keys
+        val canonicalIds = capabilityIds.mapNotNull(::canonicalId).toSet()
+        val selected = canonicalIds.mapNotNull(canonicalById::get)
+        val unknown = capabilityIds.filterTo(linkedSetOf()) { canonicalId(it) == null }
         return CapabilityValidation(
             manifestPermissions = selected.flatMapTo(linkedSetOf()) { it.manifestPermissions },
             restrictedCapabilities = selected.filter { it.requiresSpecialSystemFlow }.mapTo(linkedSetOf()) { it.id },

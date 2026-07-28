@@ -6,7 +6,9 @@ import android.content.Intent
 import android.database.Cursor
 import android.net.Uri
 import android.provider.OpenableColumns
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.BackHandler
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -43,6 +45,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -61,6 +64,11 @@ import androidx.compose.ui.unit.dp
 import com.zhique.core.project.CapabilityRegistry
 import com.zhique.core.project.ExternalCodeImport
 import com.zhique.core.project.ProjectDocument
+import com.zhique.core.project.PromptLanguage
+import com.zhique.core.stabilization.ApilotAvailability
+import com.zhique.core.stabilization.BackNavigationAction
+import com.zhique.core.stabilization.BackNavigationPolicy
+import com.zhique.core.stabilization.BackNavigationState
 import com.zhique.studio.BuildConfig
 import com.zhique.studio.PreviewRuntimeStatus
 import com.zhique.studio.StudioLanguage
@@ -71,8 +79,10 @@ import com.zhique.studio.TemplateDefinition
 import com.zhique.studio.UpdateUiState
 import com.zhique.studio.WorkspaceTab
 import com.zhique.studio.data.AiSettings
+import com.zhique.studio.integrations.AndroidApilotDetector
 import com.zhique.studio.integrations.ApilotV2
 import com.zhique.studio.preview.WeaverPreview
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -85,6 +95,45 @@ fun ZhiqueApp(viewModel: StudioViewModel) {
     var showTemplates by rememberSaveable { mutableStateOf(false) }
     var pasteIntoCurrentProject by rememberSaveable { mutableStateOf(false) }
     var showPasteScreen by rememberSaveable { mutableStateOf(false) }
+    var apilotGuidance by remember { mutableStateOf<ApilotAvailability?>(null) }
+    var exitArmed by rememberSaveable { mutableStateOf(false) }
+
+    LaunchedEffect(exitArmed) {
+        if (exitArmed) {
+            delay(2_000)
+            exitArmed = false
+        }
+    }
+
+    BackHandler {
+        val hasTransientUi = showSettings || showCreate || showTemplates || showPasteScreen || apilotGuidance != null || state.aiDraft != null
+        when (
+            BackNavigationPolicy.decide(
+                BackNavigationState(
+                    hasTransientUi = hasTransientUi,
+                    canNavigateUp = false,
+                    isProjectRoot = state.selectedDocument != null,
+                    exitArmed = exitArmed
+                )
+            )
+        ) {
+            BackNavigationAction.CloseTransientUi -> when {
+                apilotGuidance != null -> apilotGuidance = null
+                state.aiDraft != null -> viewModel.dismissAiDraft()
+                showSettings -> showSettings = false
+                showCreate -> showCreate = false
+                showTemplates -> showTemplates = false
+                showPasteScreen -> showPasteScreen = false
+            }
+            BackNavigationAction.ReturnHome -> viewModel.closeProject()
+            BackNavigationAction.ArmExit -> {
+                exitArmed = true
+                viewModel.showNotice("再按一次返回退出织雀。")
+            }
+            BackNavigationAction.ExitApplication -> (context as? Activity)?.finish()
+            BackNavigationAction.NavigateUp -> Unit
+        }
+    }
 
     val apilotPicker = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         when {
@@ -97,20 +146,17 @@ fun ZhiqueApp(viewModel: StudioViewModel) {
         }
     }
     val launchApilotPicker: (Boolean) -> Unit = { includeApiKey ->
-        if (ApilotV2.isAvailable(context)) {
-            apilotPicker.launch(ApilotV2.createPickIntent(includeApiKey))
-        } else {
-            viewModel.showNotice("未安装 Apilot，正在打开其项目仓库供你安装。")
-            uriHandler.openUri(ApilotV2.repositoryUrl)
+        when (val availability = AndroidApilotDetector.detect(context)) {
+            is ApilotAvailability.InstalledCompatible -> apilotPicker.launch(ApilotV2.createPickIntent(includeApiKey))
+            else -> apilotGuidance = availability
         }
     }
     val launchApilotExport: (AiSettings, Boolean) -> Unit = { settings, includeApiKey ->
-        if (ApilotV2.isAvailable(context)) {
-            runCatching { context.startActivity(ApilotV2.createExportIntent(context, settings, includeApiKey)) }
-                .onFailure { viewModel.showNotice(it.message ?: "无法打开 Apilot。") }
-        } else {
-            viewModel.showNotice("未安装 Apilot，正在打开其项目仓库供你安装。")
-            uriHandler.openUri(ApilotV2.repositoryUrl)
+        when (val availability = AndroidApilotDetector.detect(context)) {
+            is ApilotAvailability.InstalledCompatible -> runCatching {
+                context.startActivity(ApilotV2.createExportIntent(context, settings, includeApiKey))
+            }.onFailure { viewModel.showNotice(it.message ?: "无法打开 Apilot。") }
+            else -> apilotGuidance = availability
         }
     }
 
@@ -140,7 +186,7 @@ fun ZhiqueApp(viewModel: StudioViewModel) {
                     },
                     navigationIcon = {
                         if (state.selectedDocument != null) {
-                            TextButton(onClick = viewModel::closeProject) { Text("项目") }
+                            TextButton(onClick = viewModel::closeProject) { Text("返回") }
                         }
                     },
                     actions = {
@@ -206,6 +252,28 @@ fun ZhiqueApp(viewModel: StudioViewModel) {
             text = { Text(draft.take(2500)) },
             confirmButton = { TextButton(onClick = viewModel::applyAiDraftToIndex) { Text("写入并预览") } },
             dismissButton = { TextButton(onClick = viewModel::dismissAiDraft) { Text("放弃") } }
+        )
+    }
+    apilotGuidance?.let { availability ->
+        ApilotGuidanceDialog(
+            availability = availability,
+            onDismiss = { apilotGuidance = null },
+            onOpenRepository = {
+                apilotGuidance = null
+                uriHandler.openUri(ApilotV2.repositoryUrl)
+            },
+            onOpenApplication = {
+                if (!AndroidApilotDetector.launchApplication(context)) {
+                    viewModel.showNotice("无法打开 Apilot，请检查其安装状态。")
+                }
+                apilotGuidance = null
+            },
+            onOpenAppSettings = {
+                context.startActivity(
+                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${ApilotV2.packageName}"))
+                )
+                apilotGuidance = null
+            }
         )
     }
 }
@@ -400,7 +468,18 @@ private fun AiPanel(state: StudioUiState, document: ProjectDocument, viewModel: 
                     if (state.isAiRequestRunning) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                     else Text("生成草案")
                 }
-                OutlinedButton(onClick = { clipboard.setText(AnnotatedString(viewModel.copyExternalPrompt())) }) { Text("复制外部提示词") }
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(
+                    onClick = { clipboard.setText(AnnotatedString(viewModel.copyExternalPrompt(PromptLanguage.ZhCn))) },
+                    modifier = Modifier.weight(1f)
+                ) { Text("复制中文提示词") }
+                OutlinedButton(
+                    onClick = { clipboard.setText(AnnotatedString(viewModel.copyExternalPrompt(PromptLanguage.En))) },
+                    modifier = Modifier.weight(1f)
+                ) { Text("Copy English prompt") }
             }
         }
         state.importAnalysis?.let { analysis ->
@@ -745,7 +824,7 @@ private fun TemplateCenterDialog(onDismiss: () -> Unit, onChoose: (TemplateDefin
         title = { Text("模板中心") },
         text = {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(TemplateCatalog.all, key = { it.id }) { template ->
+                items(TemplateCatalog.visible, key = { it.id }) { template ->
                     Card(Modifier.fillMaxWidth().clickable { onChoose(template) }) {
                         Column(Modifier.padding(12.dp)) {
                             Text(template.title, fontWeight = FontWeight.SemiBold)

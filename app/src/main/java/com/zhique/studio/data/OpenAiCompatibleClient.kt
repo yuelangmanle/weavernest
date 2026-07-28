@@ -1,6 +1,7 @@
 package com.zhique.studio.data
 
 import com.zhique.core.project.PromptPack
+import com.zhique.core.project.PromptLanguage
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -14,14 +15,19 @@ import kotlinx.coroutines.withContext
 class OpenAiCompatibleClient(
     private val client: OkHttpClient = OkHttpClient()
 ) {
-    suspend fun generate(settings: AiSettings, projectName: String, request: String): String =
+    suspend fun generate(
+        settings: AiSettings,
+        projectName: String,
+        request: String,
+        promptLanguage: PromptLanguage = PromptLanguage.ZhCn
+    ): String =
         withContext(Dispatchers.IO) {
             require(settings.apiKey.isNotBlank()) { "请先在 AI 设置中填写 API Key。" }
             require(settings.endpoint.startsWith("https://")) { "AI 接口地址必须使用 HTTPS。" }
             val body = JSONObject().apply {
                 put("model", settings.model)
                 put("messages", JSONArray().apply {
-                    put(JSONObject().put("role", "system").put("content", PromptPack.default().renderForExternalModel(projectName)))
+                    put(JSONObject().put("role", "system").put("content", PromptPack.default(promptLanguage).renderForExternalModel(projectName)))
                     put(JSONObject().put("role", "user").put("content", request))
                 })
             }

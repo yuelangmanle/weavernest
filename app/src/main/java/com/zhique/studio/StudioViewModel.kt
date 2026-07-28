@@ -23,8 +23,12 @@ import com.zhique.core.project.ImportAnalysis
 import com.zhique.core.project.ProjectDocument
 import com.zhique.core.project.ProjectMetadata
 import com.zhique.core.project.ProjectReleasePolicy
+import com.zhique.core.project.PromptLanguage
 import com.zhique.core.project.ReleaseUpdatePolicy
 import com.zhique.core.project.UpdateAvailability
+import com.zhique.core.template.TemplatePublication
+import com.zhique.core.template.TemplatePublicationPolicy
+import com.zhique.core.template.TemplateStatus
 import com.zhique.studio.data.AiSettings
 import com.zhique.studio.data.AiSettingsStore
 import com.zhique.studio.data.GitHubReleaseClient
@@ -91,26 +95,31 @@ data class TemplateDefinition(
     val category: String,
     val description: String,
     val capabilities: Set<String>,
-    val html: String
+    val html: String,
+    val status: TemplateStatus = TemplateStatus.Hidden
 )
 
 object TemplateCatalog {
     val all = listOf(
-        TemplateDefinition("camera", "拍照识别", "影像与媒体", "拍摄图片并接入识别 API。", setOf("camera", "network"), starterPage("拍照识别", "拍照后可发送到公开识别 API。")),
-        TemplateDefinition("music", "音乐播放器", "影像与媒体", "播放本地或网络音频。", setOf("media_audio", "files", "network"), starterPage("音乐播放器", "选择音频文件后开始播放。")),
-        TemplateDefinition("album", "相册管理", "影像与媒体", "浏览和管理图片资源。", setOf("media_images", "files"), starterPage("相册管理", "管理图片和相册索引。")),
-        TemplateDefinition("files", "文件工具", "文件与数据", "选择、保存和整理文件。", setOf("files"), starterPage("文件工具", "通过文件能力选择和保存文件。")),
-        TemplateDefinition("forms", "离线表单", "文件与数据", "离线填写、保存和导出记录。", emptySet(), starterPage("离线表单", "数据将保存在本机。")),
-        TemplateDefinition("location", "定位签到", "定位与传感器", "获取位置并保存签到记录。", setOf("location"), starterPage("定位签到", "请求定位后记录当前位置。")),
-        TemplateDefinition("ble", "蓝牙 BLE 控制", "蓝牙与近场", "扫描和连接低功耗蓝牙设备。", setOf("bluetooth_le"), starterPage("蓝牙 BLE 控制", "扫描附近的 BLE 设备。")),
-        TemplateDefinition("nfc", "NFC 标签工具", "蓝牙与近场", "读取和写入 NFC 标签。", setOf("nfc"), starterPage("NFC 标签工具", "读取附近 NFC 标签。")),
-        TemplateDefinition("wifi", "Wi-Fi 网络诊断", "Wi-Fi 与网络", "显示网络状态和 Wi-Fi 限制说明。", setOf("wifi_scan", "network"), starterPage("Wi-Fi 网络诊断", "系统会在需要时要求确认。")),
-        TemplateDefinition("hotspot", "局部热点", "Wi-Fi 与网络", "创建受系统限制的局部热点。", setOf("local_hotspot"), starterPage("局部热点", "仅支持 Android 允许的局部热点模式。")),
-        TemplateDefinition("api", "API 数据面板", "Wi-Fi 与网络", "请求公开 API 并展示结果。", setOf("network"), starterPage("API 数据面板", "使用公开 API 或运行时私密配置。")),
-        TemplateDefinition("notifications", "通知提醒", "系统能力", "创建本地通知和提醒。", setOf("notifications"), starterPage("通知提醒", "通知必须由用户操作触发。")),
-        TemplateDefinition("contacts", "联系人助手", "系统能力", "读取联系人并生成本地工具。", setOf("contacts"), starterPage("联系人助手", "只在明确操作后请求联系人权限。")),
-        TemplateDefinition("automation", "AI 自动化", "AI 与自动化", "调用用户配置的公共 API 工作流。", setOf("network"), starterPage("AI 自动化", "私密密钥由最终使用者在运行时填写。"))
+        TemplateDefinition("camera", "拍照识别", "影像与媒体", "原生相机模块验证完成后开放。", setOf("camera", "network"), starterPage("拍照识别", "此模板尚未通过真机能力验收。")),
+        TemplateDefinition("music", "音乐播放器", "影像与媒体", "原生媒体模块验证完成后开放。", setOf("media_audio", "files", "network"), starterPage("音乐播放器", "此模板尚未通过真机能力验收。")),
+        TemplateDefinition("album", "相册管理", "影像与媒体", "原生相册模块验证完成后开放。", setOf("media_images", "files"), starterPage("相册管理", "此模板尚未通过真机能力验收。")),
+        TemplateDefinition("files", "文件工具", "文件与数据", "原生文件模块验证完成后开放。", setOf("files"), starterPage("文件工具", "此模板尚未通过真机能力验收。")),
+        TemplateDefinition("forms", "离线表单", "文件与数据", "离线填写并保存到项目数据。", emptySet(), starterPage("离线表单", "数据将保存在本机。"), TemplateStatus.Available),
+        TemplateDefinition("location", "定位签到", "定位与传感器", "原生定位模块验证完成后开放。", setOf("location"), starterPage("定位签到", "此模板尚未通过真机能力验收。")),
+        TemplateDefinition("ble", "蓝牙 BLE 控制", "蓝牙与近场", "原生蓝牙模块验证完成后开放。", setOf("bluetooth_le"), starterPage("蓝牙 BLE 控制", "此模板尚未通过真机能力验收。")),
+        TemplateDefinition("nfc", "NFC 标签工具", "蓝牙与近场", "原生 NFC 模块验证完成后开放。", setOf("nfc"), starterPage("NFC 标签工具", "此模板尚未通过真机能力验收。")),
+        TemplateDefinition("wifi", "Wi-Fi 网络诊断", "Wi-Fi 与网络", "原生 Wi-Fi 模块验证完成后开放。", setOf("wifi_scan", "network"), starterPage("Wi-Fi 网络诊断", "此模板尚未通过真机能力验收。")),
+        TemplateDefinition("hotspot", "局部热点", "Wi-Fi 与网络", "局部热点模块验证完成后开放。", setOf("local_hotspot"), starterPage("局部热点", "此模板尚未通过真机能力验收。")),
+        TemplateDefinition("api", "API 数据面板", "Wi-Fi 与网络", "公开 API 请求界面正在验证。", setOf("network"), starterPage("API 数据面板", "此模板尚未通过真机能力验收。")),
+        TemplateDefinition("notifications", "通知提醒", "系统能力", "原生通知模块验证完成后开放。", setOf("notifications"), starterPage("通知提醒", "此模板尚未通过真机能力验收。")),
+        TemplateDefinition("contacts", "联系人助手", "系统能力", "原生联系人模块验证完成后开放。", setOf("contacts"), starterPage("联系人助手", "此模板尚未通过真机能力验收。")),
+        TemplateDefinition("automation", "AI 自动化", "AI 与自动化", "运行时配置模块验证完成后开放。", setOf("network"), starterPage("AI 自动化", "此模板尚未通过真机能力验收。"))
     )
+
+    val visible: List<TemplateDefinition>
+        get() = TemplatePublicationPolicy.visible(all.map { TemplatePublication(it.id, it.status) })
+            .mapNotNull { publication -> all.firstOrNull { it.id == publication.id } }
 
     private fun starterPage(title: String, copy: String): String = """
         <!doctype html>
@@ -151,7 +160,7 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun createBlankProject(displayName: String) {
-        createProject(displayName, emptySet(), TemplateCatalog.all.first().html)
+        createProject(displayName, emptySet(), TemplateCatalog.visible.first().html)
     }
 
     fun createFromTemplate(template: TemplateDefinition) {
@@ -270,7 +279,7 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
             }
         }.onSuccess { (files, assets) ->
             val index = files["index.html"] ?: files.entries.firstOrNull { it.key.endsWith(".html", true) }?.value
-                ?: TemplateCatalog.all.first().html
+                ?: TemplateCatalog.visible.first().html
             createProject(fileName.substringBeforeLast('.').ifBlank { "导入项目" }, emptySet(), index, files - "index.html", assets)
         }.onFailure { error ->
             state = state.copy(notice = error.message ?: "ZIP 导入失败。")
@@ -282,8 +291,8 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
         state = state.copy(importAnalysis = CodeImportAnalyzer.analyze(document.files))
     }
 
-    fun copyExternalPrompt(): String = state.selectedDocument
-        ?.let { document -> com.zhique.core.project.PromptPack.default().renderForExternalModel(document.metadata.displayName) }
+    fun copyExternalPrompt(language: PromptLanguage = state.promptLanguage()): String = state.selectedDocument
+        ?.let { document -> com.zhique.core.project.PromptPack.default(language).renderForExternalModel(document.metadata.displayName) }
         .orEmpty()
 
     fun loadAiSettings(): AiSettings = aiSettingsStore.load()
@@ -298,7 +307,7 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
         if (prompt.isBlank()) return
         state = state.copy(isAiRequestRunning = true, notice = null)
         viewModelScope.launch {
-            runCatching { aiClient.generate(aiSettingsStore.load(), document.metadata.displayName, prompt.trim()) }
+            runCatching { aiClient.generate(aiSettingsStore.load(), document.metadata.displayName, prompt.trim(), state.promptLanguage()) }
                 .onSuccess { response -> state = state.copy(aiDraft = response, isAiRequestRunning = false) }
                 .onFailure { error -> state = state.copy(isAiRequestRunning = false, notice = error.message ?: "AI 请求失败。") }
         }
@@ -479,4 +488,9 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
     private fun String.isTextFile(): Boolean = lowercase(Locale.ROOT).endsWith(
         ".html"
     ) || lowercase(Locale.ROOT).endsWith(".css") || lowercase(Locale.ROOT).endsWith(".js") || lowercase(Locale.ROOT).endsWith(".json") || lowercase(Locale.ROOT).endsWith(".txt") || lowercase(Locale.ROOT).endsWith(".md")
+}
+
+private fun StudioUiState.promptLanguage(): PromptLanguage = when (language) {
+    StudioLanguage.Chinese -> PromptLanguage.ZhCn
+    StudioLanguage.English -> PromptLanguage.En
 }

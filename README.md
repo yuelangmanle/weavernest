@@ -2,7 +2,7 @@
 
 织雀是一个 Android 端 AI 小工具创作器，面向不会编程但希望快速做出可用工具的人。用户可以用自然语言创建项目，也可以粘贴 HTML/CSS/JavaScript 或导入完整 ZIP，在手机上编辑、预览、保存并配置能力。
 
-当前版本：`0.3.0-alpha`
+当前版本：`0.3.1-alpha`
 
 ## 当前可用能力
 
@@ -12,11 +12,14 @@
 - 本地 WebView 预览，`weaver` JS 桥、按项目隔离的持久化预览数据、运行/停止控制和 JavaScript 错误日志。
 - GitHub Releases 更新检查；仅在新版本附带 APK 时显示直接下载按钮，下载交给 Android 系统下载管理器。
 - Apilot V2 API Profile 互操作：从 Apilot 选择连接/模型，或经确认后把当前方案发送给 Apilot。
+- Android 返回行为、Apilot 安装引导、`weaver-required` 能力识别和中英文外部 AI 提示词。
 - 织雀启动图标、项目版本/包名锁定规则、项目能力到 Manifest 权限的核心策略。
 
 ## Alpha 边界
 
 这是首个可构建 Alpha 基线。相机、媒体、定位、蓝牙、Wi-Fi/热点等能力已经进入能力注册表和模板规划；部分 Android 原生模块和轻量 APK 模板组装器仍处于真机技术验证阶段，受系统限制的能力会明确提示，不会伪装成可用。
+
+`0.3.1-alpha` 会在项目脚本前提供 `window.weaver` 并识别能力注释，但 P0 原生权限调用仍会返回明确的 `UNSUPPORTED`，直至 Runtime 2.0 完成真机验证。
 
 ## 本地构建
 

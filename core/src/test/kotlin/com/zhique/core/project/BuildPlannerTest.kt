@@ -7,6 +7,19 @@ import kotlin.test.assertTrue
 
 class BuildPlannerTest {
     @Test
+    fun `P0 permission diagnostic capabilities are known and declare required Android permissions`() {
+        val validation = CapabilityRegistry.validate(
+            setOf("camera", "geolocation", "storage", "notification", "contacts", "microphone", "clipboard", "haptics", "sensors", "config")
+        )
+
+        assertEquals(emptySet(), validation.unknownCapabilities)
+        assertTrue("android.permission.CAMERA" in validation.manifestPermissions)
+        assertTrue("android.permission.ACCESS_FINE_LOCATION" in validation.manifestPermissions)
+        assertTrue("android.permission.POST_NOTIFICATIONS" in validation.manifestPermissions)
+        assertTrue("android.permission.RECORD_AUDIO" in validation.manifestPermissions)
+        assertTrue("android.permission.VIBRATE" in validation.manifestPermissions)
+    }
+    @Test
     fun `build plan declares only selected capability permissions`() {
         val plan = BuildPlanner.prepare(
             ProjectMetadata.create("扫描", "app.zhique.scan").copy(

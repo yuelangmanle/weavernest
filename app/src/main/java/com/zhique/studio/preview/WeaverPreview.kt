@@ -9,6 +9,8 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceError
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.webkit.WebViewCompat
+import androidx.webkit.WebViewFeature
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -19,6 +21,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import com.zhique.core.project.ProjectDocument
+import com.zhique.core.runtime.WeaverBootstrap
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -57,7 +60,7 @@ fun WeaverPreview(
         target.addJavascriptInterface(PreviewBridge(target.context, document), "ZhiqueNative")
         target.loadDataWithBaseURL(
             "https://zhique.local/${document.metadata.id}/",
-            document.previewHtml(),
+            document.previewHtml(needsFallbackBootstrap = !WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)),
             "text/html",
             "UTF-8",
             null
@@ -75,6 +78,9 @@ private fun createWebView(
     settings.domStorageEnabled = true
     settings.allowFileAccess = false
     settings.allowContentAccess = false
+    if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+        WebViewCompat.addDocumentStartJavaScript(this, WeaverBootstrap.documentStartScript(), setOf("https://zhique.local"))
+    }
     webChromeClient = object : WebChromeClient() {
         override fun onConsoleMessage(consoleMessage: ConsoleMessage): Boolean {
             onLog("JS: ${consoleMessage.message()} (${consoleMessage.lineNumber()})", consoleMessage.messageLevel() == ConsoleMessage.MessageLevel.ERROR)
@@ -110,30 +116,36 @@ private class PreviewBridge(
     }
 
     @JavascriptInterface
+    fun call(method: String, rawParams: String): String = when (method) {
+        "capabilities.list" -> JSONArray(document.metadata.capabilities.toList()).toString()
+        "capabilities.status" -> {
+            val id = runCatching { JSONObject(rawParams).optString("id") }.getOrDefault("")
+            JSONObject().apply {
+                put("id", id)
+                put("selected", id in document.metadata.capabilities)
+                put("state", if (id in document.metadata.capabilities) "not_implemented" else "not_selected")
+            }.toString()
+        }
+        else -> JSONObject().apply {
+            put("code", "UNSUPPORTED")
+            put("method", method)
+            put("message", "This runtime build does not implement $method yet.")
+        }.toString()
+    }
+
+    @JavascriptInterface
     fun unavailable(capability: String): String = JSONObject().apply {
         put("ok", false)
         put("error", "${capability} native module is not available in this Alpha preview.")
     }.toString()
 }
 
-private fun ProjectDocument.previewHtml(): String {
-    val source = files["index.html"].orEmpty().ifBlank { "<html><body><p>未找到 index.html</p></body></html>" }
+private fun ProjectDocument.previewHtml(needsFallbackBootstrap: Boolean): String {
+    val rawSource = files["index.html"].orEmpty().ifBlank { "<html><body><p>未找到 index.html</p></body></html>" }
+    val source = if (needsFallbackBootstrap) WeaverBootstrap.injectIntoHtml(rawSource) else rawSource
     val style = files["style.css"].orEmpty()
     val script = files["app.js"].orEmpty()
-    val bridge = """
-        <script>
-        window.weaver = window.weaver || {};
-        window.weaver.capabilities = () => JSON.parse(window.ZhiqueNative.capabilities());
-        window.weaver.data = {
-          get: (key) => window.ZhiqueNative.dataGet(String(key)),
-          set: (key, value) => window.ZhiqueNative.dataSet(String(key), String(value))
-        };
-        ['camera','media','files','location','bluetooth','wifi','hotspot','notifications','system'].forEach((name) => {
-          window.weaver[name] = window.weaver[name] || { unavailable: () => JSON.parse(window.ZhiqueNative.unavailable(name)) };
-        });
-        </script>
-    """.trimIndent()
-    val additions = "<style>$style</style>$bridge<script>$script</script>"
+    val additions = "<style>$style</style><script>$script</script>"
     return if (source.contains("</body>", ignoreCase = true)) {
         source.replace(Regex("</body>", RegexOption.IGNORE_CASE), "$additions</body>")
     } else {
