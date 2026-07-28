@@ -2,7 +2,7 @@
 
 织雀是一个 Android 端 AI 小工具创作器，面向不会编程但希望快速做出可用工具的人。用户可以用自然语言创建项目，也可以粘贴 HTML/CSS/JavaScript 或导入完整 ZIP，在手机上编辑、预览、保存并配置能力。
 
-当前版本：`0.2.0-alpha`
+当前版本：`0.2.1-alpha`
 
 ## 当前可用能力
 
@@ -26,7 +26,7 @@
 .\scripts\build.ps1 -Task ':app:assembleDebug'
 ```
 
-APK 输出到 `artifacts\zhique-v0.2.0-alpha.apk`。发布前必须运行核心测试、APK 签名校验和 Manifest 检查。
+APK 输出到 `artifacts\zhique-v0.2.1-alpha.apk`。发布前必须运行核心测试、APK 签名校验和 Manifest 检查。
 
 ## 更新
 

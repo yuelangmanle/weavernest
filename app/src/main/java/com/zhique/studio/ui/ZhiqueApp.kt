@@ -401,6 +401,7 @@ private fun SettingsDialog(state: StudioUiState, viewModel: StudioViewModel, onD
                 }
                 item { HorizontalDivider() }
                 item { Text("更新日志", fontWeight = FontWeight.SemiBold) }
+                item { Text("0.2.1-alpha：修复 GitHub Actions 在 Linux Runner 上的 Gradle Wrapper 执行权限。") }
                 item { Text("0.2.0-alpha：建立 Kotlin/Compose 创作器、项目工作区、预览桥、能力目录、AI 提示词与 GitHub 更新设置。") }
                 item { TextButton(onClick = { showAiSettings = true }) { Text("AI 接口设置") } }
             }

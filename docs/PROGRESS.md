@@ -2,7 +2,7 @@
 
 ## Current iteration
 
-- Version: `0.2.0-alpha`
+- Version: `0.2.1-alpha`
 - Status: Android creator Alpha built; native capability and template-assembler verification pending
 - Updated: 2026-07-28
 

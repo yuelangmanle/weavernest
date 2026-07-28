@@ -22,7 +22,7 @@ try {
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     if ($Task -eq ':app:assembleDebug') {
         New-Item -ItemType Directory -Force (Join-Path $projectRoot 'artifacts') | Out-Null
-        Copy-Item 'app\build\outputs\apk\debug\app-debug.apk' 'artifacts\zhique-v0.2.0-alpha.apk' -Force
+        Copy-Item 'app\build\outputs\apk\debug\app-debug.apk' 'artifacts\zhique-v0.2.1-alpha.apk' -Force
     }
 } finally {
     Pop-Location

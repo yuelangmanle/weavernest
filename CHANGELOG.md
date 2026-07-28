@@ -2,6 +2,12 @@
 
 All notable user-facing changes are recorded here.
 
+## 0.2.1-alpha - 2026-07-28
+
+### Fixed
+
+- GitHub Actions 在 Linux Runner 上显式赋予 Gradle Wrapper 执行权限，确保 CI 可运行构建与测试。
+
 ## 0.2.0-alpha - 2026-07-28
 
 ### Added

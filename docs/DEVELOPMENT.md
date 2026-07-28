@@ -8,7 +8,7 @@ Generated applications expose a deliberate, permission-gated bridge from web cod
 
 ## Alpha implementation status
 
-The `0.2.0-alpha` creator builds with the local JDK 17, Gradle 8.10.2, and Android SDK 35 toolchain under `.local`. It includes the project workspace, persistent WebView preview, core capability registry, import analysis, prompt pack, encrypted AI settings, supplied launcher icon, GitHub Releases update settings, and signed APK output. The preview bridge currently exposes persistent data and explicit unavailable states for native operations whose device modules have not passed the Android 10+ matrix yet.
+The `0.2.1-alpha` creator builds with the local JDK 17, Gradle 8.10.2, and Android SDK 35 toolchain under `.local`. It includes the project workspace, persistent WebView preview, core capability registry, import analysis, prompt pack, encrypted AI settings, supplied launcher icon, GitHub Releases update settings, and signed APK output. The preview bridge currently exposes persistent data and explicit unavailable states for native operations whose device modules have not passed the Android 10+ matrix yet.
 
 The next validation gate is the real template APK assembler: it must generate a second installable package with a different project identity, selected Manifest permissions, and a project signing key without requiring a full Android IDE toolchain on the target device.
 
