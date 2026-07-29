@@ -15,4 +15,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "Zhique"
-include(":app", ":core")
+include(":app", ":core", ":runtime", ":template-runtime")

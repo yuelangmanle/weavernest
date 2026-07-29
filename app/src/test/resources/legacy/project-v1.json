@@ -1,0 +1,11 @@
+{
+  "id": "legacy-fixture-id",
+  "displayName": "Legacy Fixture",
+  "packageName": "app.zhique.legacyfixture",
+  "files": {
+    "index.html": "<!doctype html><html><body><button onclick=\"window.weaver.data.set('saved','yes')\">Save</button></body></html>"
+  },
+  "binaryAssets": {},
+  "capabilities": ["camera"],
+  "buildHistory": []
+}

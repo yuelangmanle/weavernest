@@ -1,9 +1,11 @@
 import java.util.Properties
+import org.gradle.api.tasks.Copy
 
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    id("org.jetbrains.kotlin.kapt")
 }
 
 val signingProperties = Properties().apply {
@@ -21,8 +23,8 @@ android {
         applicationId = "com.zhique.studio"
         minSdk = 29
         targetSdk = 35
-        versionCode = 5
-        versionName = "0.3.1-alpha"
+        versionCode = 7
+        versionName = "0.5.0-alpha"
         buildConfigField("String", "GITHUB_REPOSITORY", "\"yuelangmanle/weavernest\"")
     }
 
@@ -64,6 +66,7 @@ android {
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
     }
+    sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/templateRuntimeAssets"))
     kotlinOptions {
         jvmTarget = "17"
     }
@@ -71,6 +74,7 @@ android {
 
 dependencies {
     implementation(project(":core"))
+    implementation(project(":runtime"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime)
@@ -82,9 +86,36 @@ dependencies {
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+    implementation("androidx.compose.material:material-icons-extended")
     implementation(libs.zip4j)
     implementation(libs.okhttp)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.security.crypto)
+    implementation(libs.arsc.lib)
+    implementation(libs.apk.sig)
+    implementation(libs.room.runtime)
+    implementation(libs.room.ktx)
+    kapt(libs.room.compiler)
     debugImplementation(libs.androidx.compose.ui.tooling)
+    testImplementation(kotlin("test"))
+    testImplementation("org.json:json:20240303")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
 }
+
+kapt {
+    arguments {
+        arg("room.schemaLocation", file("schemas").path)
+    }
+}
+
+val generatedTemplateAssets = layout.buildDirectory.dir("generated/templateRuntimeAssets")
+val copyTemplateRuntimeApk by tasks.registering(Copy::class) {
+    dependsOn(":template-runtime:assembleRelease")
+    from(project(":template-runtime").layout.buildDirectory.file("outputs/apk/release/template-runtime-release-unsigned.apk"))
+    into(generatedTemplateAssets.map { it.dir("template") })
+    rename { "zhique-template-runtime.apk" }
+}
+
+tasks.matching { task -> task.name.startsWith("merge") && task.name.endsWith("Assets") }
+    .configureEach { dependsOn(copyTemplateRuntimeApk) }

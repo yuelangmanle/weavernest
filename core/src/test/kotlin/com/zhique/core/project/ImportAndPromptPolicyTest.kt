@@ -16,14 +16,14 @@ class ImportAndPromptPolicyTest {
 
         assertEquals(setOf("geolocation", "bluetooth_le"), analysis.suggestedCapabilities)
         assertTrue(analysis.suggestions.any { it.replacement.contains("weaver.geolocation.getCurrentPosition") })
-        assertTrue(analysis.suggestions.any { it.replacement.contains("weaver.bluetooth.requestDevice") })
+        assertTrue(analysis.suggestions.any { it.replacement.contains("weaver.bluetooth.scan") })
     }
 
     @Test
     fun `weaver required comment becomes canonical project capabilities`() {
         val analysis = CodeImportAnalyzer.analyze(
             mapOf(
-                "index.html" to "<!-- weaver-required: camera, geolocation, storage, notification, contacts, microphone, clipboard, vibrate, sensor, config -->"
+                "index.html" to "<!-- weaver-required: camera, geolocation, storage, notification, contacts, mic, clipboard, vibrate, sensor, config -->"
             )
         )
 
@@ -31,6 +31,29 @@ class ImportAndPromptPolicyTest {
             setOf("camera", "geolocation", "storage", "notification", "contacts", "microphone", "clipboard", "haptics", "sensors", "config"),
             analysis.suggestedCapabilities
         )
+    }
+
+    @Test
+    fun `analysis discovers valid runtime calls and reports unknown calls`() {
+        val analysis = CodeImportAnalyzer.analyze(
+            mapOf(
+                "index.html" to """
+                    <script>
+                      window.weaver.ready();
+                      weaver.camera.capture({ quality: 0.8 });
+                      weaver.camera.takeEverything();
+                      weaver.camera.recordVideo();
+                    </script>
+                    <!-- weaver-required: camera, imaginary_capability -->
+                """.trimIndent()
+            )
+        )
+
+        assertTrue("camera" in analysis.suggestedCapabilities)
+        assertTrue("window.weaver.ready" in analysis.detectedRuntimeMethods)
+        assertEquals(listOf(UnknownRuntimeMethod("index.html", "weaver.camera.takeEverything")), analysis.unknownRuntimeMethods)
+        assertEquals(listOf(UnavailableRuntimeMethod("index.html", "weaver.camera.recordVideo")), analysis.unavailableRuntimeMethods)
+        assertEquals(setOf("imaginary_capability"), analysis.unknownDeclaredCapabilities)
     }
 
     @Test
@@ -47,7 +70,7 @@ class ImportAndPromptPolicyTest {
         val chinese = PromptPack.default(PromptLanguage.ZhCn).renderForExternalModel("权限测试")
         val english = PromptPack.default(PromptLanguage.En).renderForExternalModel("Permission test")
 
-        listOf("window.weaver.ready", "weaver.camera.capture", "weaver.geolocation.getCurrentPosition", "weaver.storage.writeFile", "weaver.notification.show", "weaver.config.get").forEach { api ->
+        RuntimeApiCatalog.implementedPublicMethodNames.forEach { api ->
             assertTrue(chinese.contains(api))
             assertTrue(english.contains(api))
         }

@@ -1,7 +1,9 @@
 .local/
 .gradle/
+.kotlin/
 **/build/
 artifacts/
+editor/node_modules/
 *.apk
 *.aab
 *.keystore

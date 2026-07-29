@@ -1,0 +1,118 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "d65849fa21da16048e2fac1c0302bcd5",
+    "entities": [
+      {
+        "tableName": "project_metadata",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `displayName` TEXT NOT NULL, `packageName` TEXT NOT NULL, `packageNameLocked` INTEGER NOT NULL, `versionName` TEXT NOT NULL, `versionCode` INTEGER NOT NULL, `lastModifiedEpochMillis` INTEGER NOT NULL, `capabilitiesJson` TEXT NOT NULL, `promptPackVersion` TEXT NOT NULL, `previewDataPersistence` TEXT NOT NULL, `iconAssetPath` TEXT, `signingKeyId` TEXT, `signingCertificateSha256` TEXT, `signingBackupId` TEXT, `buildHistoryJson` TEXT NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "displayName",
+            "columnName": "displayName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "packageName",
+            "columnName": "packageName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "packageNameLocked",
+            "columnName": "packageNameLocked",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "versionName",
+            "columnName": "versionName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "versionCode",
+            "columnName": "versionCode",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastModifiedEpochMillis",
+            "columnName": "lastModifiedEpochMillis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "capabilitiesJson",
+            "columnName": "capabilitiesJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "promptPackVersion",
+            "columnName": "promptPackVersion",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "previewDataPersistence",
+            "columnName": "previewDataPersistence",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "iconAssetPath",
+            "columnName": "iconAssetPath",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "signingKeyId",
+            "columnName": "signingKeyId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "signingCertificateSha256",
+            "columnName": "signingCertificateSha256",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "signingBackupId",
+            "columnName": "signingBackupId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "buildHistoryJson",
+            "columnName": "buildHistoryJson",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      }
+    ],
+    "views": [],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'd65849fa21da16048e2fac1c0302bcd5')"
+    ]
+  }
+}

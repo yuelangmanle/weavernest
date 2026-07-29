@@ -2,6 +2,12 @@ package com.zhique.core.project
 
 import java.util.UUID
 
+/** Controls whether ordinary preview application data survives a new preview session. */
+enum class PreviewDataPersistence {
+    Persistent,
+    Ephemeral
+}
+
 data class ProjectMetadata(
     val id: String,
     val displayName: String,
@@ -9,8 +15,19 @@ data class ProjectMetadata(
     val packageNameLocked: Boolean = false,
     val versionName: String = "1.0.0",
     val versionCode: Int = 0,
+    /** Project source edit timestamp; never used for Android versioning or signing identity. */
+    val lastModifiedEpochMillis: Long = System.currentTimeMillis(),
     val capabilities: Set<String> = emptySet(),
-    val promptPackVersion: String = "1"
+    val promptPackVersion: String = "1",
+    val previewDataPersistence: PreviewDataPersistence = PreviewDataPersistence.Persistent,
+    /** Optional project-local image path used for the generated application icon. */
+    val iconAssetPath: String? = null,
+    /** Non-secret key reference; material is stored exclusively by ProjectKeyStore. */
+    val signingKeyId: String? = null,
+    /** SHA-256 certificate fingerprint for recovery and update compatibility checks. */
+    val signingCertificateSha256: String? = null,
+    /** Reference to password-encrypted project-key backup, if one was exported. */
+    val signingBackupId: String? = null
 ) {
     companion object {
         fun create(displayName: String, packageName: String): ProjectMetadata {

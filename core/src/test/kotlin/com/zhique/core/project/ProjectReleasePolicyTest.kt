@@ -46,11 +46,14 @@ class ProjectReleasePolicyTest {
     }
 
     @Test
-    fun `capability registry excludes signature only permissions`() {
+    fun `capability registry declares user selected special file access permission`() {
         val validation = CapabilityRegistry.validate(setOf("camera", "manage_external_storage"))
 
         assertTrue(validation.isAllowed)
-        assertEquals(setOf("android.permission.CAMERA"), validation.manifestPermissions)
+        assertEquals(
+            setOf("android.permission.CAMERA", "android.permission.MANAGE_EXTERNAL_STORAGE"),
+            validation.manifestPermissions
+        )
         assertTrue("manage_external_storage" in validation.restrictedCapabilities)
     }
 }

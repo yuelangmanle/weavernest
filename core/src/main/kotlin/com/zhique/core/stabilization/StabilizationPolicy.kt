@@ -30,6 +30,8 @@ sealed interface ApilotAvailability {
     data class InstalledIncompatible(val versionName: String?) : ApilotAvailability
     data object InstalledDisabled : ApilotAvailability
     data object NotInstalled : ApilotAvailability
+    /** The package resolved, but Android rejected or failed to start its requested activity. */
+    data object LaunchFailed : ApilotAvailability
 }
 
 object ApilotAvailabilityPolicy {

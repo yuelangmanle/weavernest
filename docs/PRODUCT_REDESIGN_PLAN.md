@@ -6,6 +6,12 @@
 
 **技术栈：** Kotlin、Jetpack Compose、Navigation Compose、StateFlow、AndroidX WebKit、WebViewAssetLoader、Activity Result API、Room、CodeMirror 6、OkHttp、WorkManager、CameraX、Media3、Nordic BLE、ZXing、Tink/Android Keystore。
 
+## 0.5.0-alpha 实施快照（2026-07-29）
+
+本计划的离线实现已推进到 Runtime 2.0、数据恢复与模板组装边界：Navigation Compose 返回栈、CodeMirror 6 本地编辑与语法诊断、Room 元数据索引、项目 workspace/快照、导入差异审核、双语 Prompt、主线程事件投递、项目复制/回收/ZIP 导出、Apilot V2 安装与启动失败状态、BLE GATT 深度桥、真实实验模板、预览与生成应用的加密公开数据备份、固定模板 APK 组装、项目密钥备份及 v2/v3 签名验证均已进入代码与自动化测试。
+
+尚未满足完成定义的部分全部需要设备证据：API 29/31/33/最新系统权限矩阵、Apilot 已安装往返、模板可用性、生成 APK 安装/覆盖更新/数据保留、视觉无障碍与性能。详见 [QA 矩阵](QA_MATRIX.md)。这些项在通过前保持 Experimental 或技术预览状态。
+
 ## 全局约束
 
 - 最低 Android API 29，目标 SDK 保持最新稳定版本。
@@ -474,7 +480,7 @@ data class PromptPack(
 - [ ] 恢复门槛：迁移失败、磁盘满、WebView 崩溃、权限永久拒绝、Apilot 取消、下载失败。
 - [ ] 安全门槛：不可信来源无法调用桥；Key、联系人、定位和文件正文不进日志。
 - [ ] 每个版本更新 VERSION、versionCode、CHANGELOG、开发书、进度书和第三方声明。
-- [ ] GitHub Release 只上传通过本机和 CI 验证的签名 APK。
+- [x] GitHub Release 工作流只上传通过 CI 验证、并使用仓库 Secrets 签名的 APK。
 
 ## 完成定义
 

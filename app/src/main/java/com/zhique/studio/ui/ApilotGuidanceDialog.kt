@@ -42,12 +42,14 @@ fun ApilotGuidanceDialog(
         is ApilotAvailability.InstalledIncompatible -> "Apilot 版本不兼容"
         is ApilotAvailability.InstalledDisabled -> "Apilot 已被停用"
         is ApilotAvailability.InstalledCompatible -> "Apilot 已就绪"
+        is ApilotAvailability.LaunchFailed -> "无法启动 Apilot"
     }
     val message = when (availability) {
         is ApilotAvailability.NotInstalled -> "导入或导出 API 方案需要 Apilot。你可以继续留在织雀，或在确认后前往 Apilot 安装说明。"
         is ApilotAvailability.InstalledIncompatible -> "检测到 Apilot ${availability.versionName.orEmpty()}，但它没有提供完整的 API Profile V2 接口。请打开 Apilot 检查更新。"
         is ApilotAvailability.InstalledDisabled -> "系统已停用 Apilot。请先在应用信息页面启用它，再重新执行此操作。"
         is ApilotAvailability.InstalledCompatible -> "Apilot 已可使用。"
+        is ApilotAvailability.LaunchFailed -> "Apilot 已被检测到，但 Android 无法启动所需页面。请返回后重试，或检查 Apilot 是否被系统限制。"
     }
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -72,11 +74,13 @@ fun ApilotGuidanceDialog(
                 is ApilotAvailability.InstalledIncompatible -> Button(onClick = onOpenApplication) { Text("打开 Apilot") }
                 is ApilotAvailability.InstalledDisabled -> Button(onClick = onOpenAppSettings) { Text("打开应用设置") }
                 is ApilotAvailability.InstalledCompatible -> Button(onClick = onDismiss) { Text("关闭") }
+                is ApilotAvailability.LaunchFailed -> Button(onClick = onDismiss) { Text("返回重试") }
             }
         },
         dismissButton = {
             when (availability) {
                 is ApilotAvailability.InstalledIncompatible -> OutlinedButton(onClick = onOpenRepository) { Text("查看更新说明") }
+                is ApilotAvailability.LaunchFailed -> OutlinedButton(onClick = onOpenAppSettings) { Text("打开应用设置") }
                 else -> TextButton(onClick = onDismiss) { Text("取消") }
             }
         }

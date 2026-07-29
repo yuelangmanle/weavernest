@@ -1,6 +1,5 @@
 package com.zhique.core.stabilization
 
-import com.zhique.core.runtime.WeaverBootstrap
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -72,25 +71,11 @@ class StabilizationPolicyTest {
     }
 
     @Test
-    fun `runtime bootstrap exposes the attachment APIs before page scripts execute`() {
-        val script = WeaverBootstrap.documentStartScript()
+    fun `Apilot launch failure remains distinct from an installation problem`() {
+        val availability: ApilotAvailability = ApilotAvailability.LaunchFailed
 
-        assertTrue(script.contains("window.weaver"))
-        assertTrue(script.contains("apiVersion"))
-        assertTrue(script.contains("camera.capture"))
-        assertTrue(script.contains("geolocation.getCurrentPosition"))
-        assertTrue(script.contains("storage.writeFile"))
-        assertTrue(script.contains("notification.show"))
-        assertTrue(script.contains("microphone.record"))
-        assertTrue(script.contains("sensor.subscribe"))
-        assertTrue(script.contains("config.get"))
+        assertEquals(ApilotAvailability.LaunchFailed, availability)
+        assertTrue(availability !is ApilotAvailability.NotInstalled)
     }
 
-    @Test
-    fun `fallback bootstrap is inserted before the first project script`() {
-        val html = "<html><head><script>window.userStarted = true;</script></head><body></body></html>"
-        val injected = WeaverBootstrap.injectIntoHtml(html)
-
-        assertTrue(injected.indexOf("window.weaver") < injected.indexOf("window.userStarted"))
-    }
 }

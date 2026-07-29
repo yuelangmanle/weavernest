@@ -1,0 +1,3 @@
+<resources>
+    <style name="Theme.ZhiqueTemplate" parent="android:style/Theme.Material.Light.NoActionBar" />
+</resources>

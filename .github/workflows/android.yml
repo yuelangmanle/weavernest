@@ -14,10 +14,25 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: editor/package-lock.json
       - uses: android-actions/setup-android@v3
       - run: sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
       - run: chmod +x gradlew
-      - run: ./gradlew :core:test :app:assembleDebug
+      - run: npm ci --prefix editor --no-audit --no-fund
+      - run: npm run build --prefix editor
+      - name: Verify version and release metadata
+        run: |
+          VERSION="$(tr -d '\r\n' < VERSION)"
+          test -n "$VERSION"
+          grep -F "versionName = \"$VERSION\"" app/build.gradle.kts
+          grep -F "## $VERSION" CHANGELOG.md
+          test -f app/schemas/com.zhique.studio.data.ProjectMetadataDatabase/1.json
+          grep -F "AndroidX Room" THIRD_PARTY_NOTICES.md
+      - run: ./gradlew :core:test :runtime:testDebugUnitTest :app:testDebugUnitTest :template-runtime:assembleRelease :app:assembleDebug
       - uses: actions/upload-artifact@v4
         with:
           name: zhique-debug-apk

@@ -1,0 +1,83 @@
+name: Signed Android Release
+
+on:
+  push:
+    tags: [ 'v*' ]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag to release (for example v0.4.0-alpha)
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: editor/package-lock.json
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+      - run: chmod +x gradlew
+      - run: npm ci --prefix editor --no-audit --no-fund
+      - run: npm run build --prefix editor
+      - name: Verify tag, version, and release notes
+        shell: bash
+        run: |
+          TAG="${{ inputs.tag || github.ref_name }}"
+          VERSION="$(tr -d '\r\n' < VERSION)"
+          test "$TAG" = "v$VERSION"
+          grep -F "versionName = \"$VERSION\"" app/build.gradle.kts
+          grep -F "## $VERSION" CHANGELOG.md
+          test -f app/schemas/com.zhique.studio.data.ProjectMetadataDatabase/1.json
+          grep -F "AndroidX Room" THIRD_PARTY_NOTICES.md
+      - name: Materialize the protected signing key
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ZHIQUE_RELEASE_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ZHIQUE_RELEASE_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ZHIQUE_RELEASE_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ZHIQUE_RELEASE_KEY_PASSWORD }}
+        run: |
+          test -n "$KEYSTORE_BASE64"
+          test -n "$STORE_PASSWORD"
+          test -n "$KEY_ALIAS"
+          test -n "$KEY_PASSWORD"
+          mkdir -p .local/keys
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > .local/keys/zhique-release.jks
+          cat > .local/keys/zhique-release.properties <<EOF
+          storeFile=.local/keys/zhique-release.jks
+          storePassword=$STORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          keyPassword=$KEY_PASSWORD
+          EOF
+      - run: ./gradlew :core:test :runtime:testDebugUnitTest :app:testDebugUnitTest :template-runtime:assembleRelease :app:assembleRelease --no-daemon
+      - name: Verify the signed release APK
+        run: |
+          # API 24 proves the v2 block exists; API 29 proves the v3 block used by 织雀 is valid.
+          $ANDROID_HOME/build-tools/35.0.0/apksigner verify --verbose --min-sdk-version 24 app/build/outputs/apk/release/app-release.apk
+          $ANDROID_HOME/build-tools/35.0.0/apksigner verify --verbose --min-sdk-version 29 app/build/outputs/apk/release/app-release.apk
+      - name: Name the release asset
+        shell: bash
+        run: |
+          VERSION="$(tr -d '\r\n' < VERSION)"
+          mkdir -p artifacts
+          cp app/build/outputs/apk/release/app-release.apk "artifacts/zhique-v$VERSION.apk"
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag || github.ref_name }}
+          generate_release_notes: true
+          files: artifacts/*.apk
